@@ -96,3 +96,29 @@
 - dictator did 78% of moderation: at cost 500 / welcome 1000
   / revoke 2000 the community cannot self-police a vandal
   storm; the input for 260911-consts
+
+# Tree build rerun (branch 260914-tree-trash, v0.21, 26/09/20)
+
+- same 21,280 events, same driver; the sections above ran on
+  the Sep-9 blob build (kept as the "before" reference)
+- counters IDENTICAL across builds (births 3,518, res_i 955,
+  res_v 2,449, recid 844, comm 1,597, dict 5,774; revokes
+  7,371 issued and 7,371 effective in BOTH runs)
+
+| run   | build | total | ev avg (5k -> 20k) | sweep (5k -> 20k) | floor |
+|-------|-------|-------|--------------------|-------------------|-------|
+| open  | blob  | 3h43m | 0.201 -> 0.626 s   | 114 s -> 37 min   | 48 MB |
+| open  | tree  | 1h15m | 0.203 -> 0.203 s   | 11 s -> 26 s      | 80 MB |
+| gated | blob  | 7h28m | 0.385 -> 1.299 s   | 248 s -> 65 min   | 72 MB |
+| gated | tree  | 2h02m | 0.329 -> 0.323 s   | 16 s -> 35 s      | 123 MB|
+
+- latency FLAT on the tree build in both modes (blob: 3x and
+  4x growth over the run)
+- sweep seconds instead of tens of minutes: 5.5 h of the old
+  gated run was gc
+- packed floor ~1.7x the blob build (per-entity files and
+  trees), but linear in both
+- gating still costs 1.6x wall time (reps query + welcome per
+  beg) and 1.5x floor; all findings above (precision 72%,
+  recidivism 34%, community 22%, reps~revoked -0.49) stand
+  unchanged on the new build
