@@ -1,0 +1,67 @@
+### A-raw
+## LIMIT=5000 WINDOW=1000 SWEEP=false GIT=true
+== N=1000  post avg=0.098s
+== N=1000  before git=40.7 MB  (pack 0.0, loose 49.8)
+== N=2000  post avg=0.135s
+== N=2000  before git=160.1 MB  (pack 0.0, loose 178.1)
+== N=3000  post avg=0.170s
+== N=3000  before git=357.0 MB  (pack 0.0, loose 384.0)
+== N=4000  post avg=0.235s
+== N=4000  before git=632.8 MB  (pack 0.0, loose 668.6)
+== N=5000  post avg=0.253s
+== N=5000  before git=985.8 MB  (pack 0.0, loose 1030.5)
+### B-sweep-git
+## LIMIT=5000 WINDOW=1000 SWEEP=true GIT=true
+== N=1000  post avg=0.098s
+== N=1000  before git=40.6 MB  (pack 0.0, loose 49.6)
+== N=1000  sweep=2.6s  []
+== N=1000  after  git=1.7 MB  (pack 0.7, loose 0.0)
+== N=2000  post avg=0.135s
+== N=2000  before git=121.1 MB  (pack 0.7, loose 128.4)
+== N=2000  sweep=9.1s  []
+== N=2000  after  git=3.5 MB  (pack 1.5, loose 0.0)
+== N=3000  post avg=0.172s
+== N=3000  before git=200.8 MB  (pack 1.5, loose 206.3)
+== N=3000  sweep=23.0s  []
+== N=3000  after  git=5.5 MB  (pack 2.6, loose 0.0)
+== N=4000  post avg=0.240s
+== N=4000  before git=282.1 MB  (pack 2.6, loose 285.5)
+== N=4000  sweep=41.4s  []
+== N=4000  after  git=8.0 MB  (pack 4.2, loose 0.0)
+== N=5000  post avg=0.258s
+== N=5000  before git=362.3 MB  (pack 4.2, loose 363.2)
+== N=5000  sweep=61.5s  []
+== N=5000  after  git=10.6 MB  (pack 5.7, loose 0.0)
+### C-sweep-nogit
+## LIMIT=5000 WINDOW=1000 SWEEP=true GIT=false
+== N=1000  post avg=0.098s
+== N=1000  before git=40.6 MB  (pack 0.0, loose 49.6)
+== N=1000  sweep=1.8s  []
+== N=1000  after  git=1.9 MB  (pack 0.9, loose 0.0)
+== N=2000  post avg=0.136s
+== N=2000  before git=121.9 MB  (pack 0.9, loose 128.9)
+== N=2000  sweep=7.4s  []
+== N=2000  after  git=4.3 MB  (pack 2.4, loose 0.0)
+== N=3000  post avg=0.171s
+== N=3000  before git=201.9 MB  (pack 2.4, loose 206.5)
+== N=3000  sweep=16.1s  []
+== N=3000  after  git=6.7 MB  (pack 3.8, loose 0.0)
+== N=4000  post avg=0.238s
+== N=4000  before git=282.9 MB  (pack 3.8, loose 285.1)
+== N=4000  sweep=28.0s  []
+== N=4000  after  git=8.8 MB  (pack 4.9, loose 0.0)
+== N=5000  post avg=0.256s
+== N=5000  before git=361.5 MB  (pack 4.9, loose 361.7)
+== N=5000  sweep=43.1s  []
+== N=5000  after  git=11.0 MB  (pack 6.2, loose 0.0)
+### D-sweep-w2500
+## LIMIT=5000 WINDOW=2500 SWEEP=true GIT=true
+== N=2500  post avg=0.125s
+== N=2500  before git=249.2 MB  (pack 0.0, loose 271.7)
+== N=2500  sweep=16.6s  []
+== N=2500  after  git=4.3 MB  (pack 1.9, loose 0.0)
+== N=5000  post avg=0.234s
+== N=5000  before git=746.0 MB  (pack 1.9, loose 764.0)
+== N=5000  sweep=77.6s  []
+== N=5000  after  git=9.8 MB  (pack 4.9, loose 0.0)
+ALL-DONE

@@ -1,0 +1,5 @@
+.freechains*
+data/
+logs/
+__pycache__/
+*.log
