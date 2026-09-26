@@ -38,7 +38,7 @@
 - `chain <alias> sync send|recv localhost:P` between
   neighbours only (never all-to-all)
 - `peers.sh`: start/stop, add/rem peer, neighbour sync,
-  convergence probe (supersedes the old `sims/peers.sh` item)
+  convergence probe (supersedes the old `peers.sh` item)
 
 # Driver
 
