@@ -5,7 +5,7 @@
   forks, convergence, hard forks, wire cost, churn recovery
 - NOT a reproduction of earlier topologies: rita-21 is one
   cluster among five; the harness takes ANY arrangement
-- 100 peers (decided 26/10/05)
+- 66 peers: 6 shapes x 10 + 6 separators (decided 26/10/05)
 
 # What freechains changes
 
@@ -19,7 +19,7 @@
 
 # Harness (arrangement-agnostic)
 
-- 100 peers, one `--root` each, full replica of the chain
+- 66 peers, one `--root` each, full replica of the chain
 - sync = pull from a neighbour's chain dir (`sync recv <dir>`),
   no daemons (as `lemmy/lemmy-p2p.lua`)
 - SEQUENTIAL: one freechains process at a time (no races,
@@ -29,42 +29,52 @@
     - schedule: edges/peers down and up in chain time (churn,
       partitions)
     - placement: author -> peer
-- sync policy: every C events of a peer, pull from its
-  in-neighbours; final rounds until all `list order` agree
+- sync policy: FLOOD in chain time with per-hop delay d
+    - after an event at ts, its peer's neighbours pull at
+      ts + d, theirs at ts + 2d, ... (discrete-event queue,
+      interleaved with later events)
+    - pull only from a neighbour that has something new (no
+      empty syncs)
+    - final rounds until all `list order` agree
+- why not "every C events": `adhd` has ~27 events/day, so 10
+  events ~ 9 h per hop, ~4-5 days across the ring: close to
+  `time.fork` (7 days), forks on nearly every event
 - `p2p/p2p.lua` reusing each corpus event stream; single-peer
   drivers untouched
 
-# Arrangement: ring of 5 clusters (decided 26/10/05)
+# Arrangement: ring of 6 shapes (decided 26/10/05)
 
-- 5 clusters joined in a RING by 3-node straight lines
-  (5 lines x 3 = 15 line peers)
-- 100 peers: 21 + 16 + 16 + 16 + 16 + 15
-    - rita-21: line 0-3, cycle 3-8, line 8-11, complete
-      12-17, line 17-20 (as rita-24), fixed
-    - small-world 16: Watts-Strogatz k=4, beta=0.1, fixed
-    - star 16: 1 hub + 15 leaves, lines attach at the hub,
-      fixed
-    - random 16: Erdos-Renyi, avg degree ~3, REDRAWN every
+- 6 shapes x 10 peers, joined in a RING by 1 separator node
+  between consecutive shapes -> 60 + 6 = 66 peers
+    - rita-10: line 0-2, cycle 2-6, line 6-9 (rita-24 style,
+      shrunk), fixed
+    - small-world 10: Watts-Strogatz k=4, beta=0.1, fixed
+    - star 10: 1 hub + 9 leaves, separators at the hub, fixed
+    - random 10: Erdos-Renyi, avg degree ~3, REDRAWN every
       epoch (e.g. 1 day of chain time); gateways kept
-    - scale-free 16: Barabasi-Albert m=2, fixed
-- gateways: one fixed node per cluster side joins each line
-  (the star's hub; a chosen node elsewhere)
-- ring, not chain: ~half the worst-case distance (~35 hops
-  end to end as a chain)
-- sizes and line length are parameters: grow any cluster
-  (ceiling ~400 peers on full `adhd`)
-- placement: authors UNIFORM over all 100 peers (sticky)
+    - scale-free 10: Barabasi-Albert m=2, fixed
+    - nebula 10: a connected 10-node sample of a REAL crawled
+      topology (Nebula, see References), fixed
+- gateways: one fixed node per shape side joins each
+  separator (the star's hub; a chosen node elsewhere)
+- worst path: ~10-12 hops (half the ring); Bitcoin ~5,
+  Ethereum 3-4 hops: ~2x deeper than real networks
+- sizes are parameters (same size for every shape)
+- placement: authors UNIFORM over all 66 peers (sticky)
 - sketch:
-    - `[rita-21]-L1-[small-world]-L2-[star]-L3-[random]`
-      `-L4-[scale-free]-L5-(back to rita-21)`
-- generator: `p2p/topo.py` (sizes, seed) -> `edges.txt`
-  (fixed clusters, lines, gateways) + `schedule.txt`
-  (random cluster epochs)
+    - `[rita]-s-[small-world]-s-[star]-s-[random]-s-`
+      `[scale-free]-s-[nebula]-s-(back to rita)`
+- diagram: `p2p/topology.dia` (5 peers per shape, 36 peers)
+- generator: `p2p/topo.py` (size, seed, nebula sample) ->
+  `edges.txt` + `schedule.txt` (random epochs)
 
 # Parameters
 
-- peers: 100 (smaller counts only for smoke)
-- sync cadence: every 1 | 10 | 100 events per peer
+- peers: 66 (smaller counts only for smoke)
+- per-hop delay d: 1 s (Bitcoin-like) | 1 min | 1 h (laptops
+  syncing hourly)
+    - fork share ~ 1 - exp(-rate x d x hops), rate ~1.1/h:
+      ~0.4% | ~20% | ~100% at 12 hops (tpd-21: 14-18%)
 - partition: none | 1 day | 8 days (crosses `time.fork`)
 - corpus slice: 5k events for sweeps; full `adhd` (33k) for
   the chosen arrangements
@@ -97,17 +107,31 @@
   at every other peer -> CPU ~ events x peers x replay cost
     - MEASURED (lemmy P2P smoke, 2k-action chain): replayed
       action ~0.15 s; empty sync 0.5 s, 28 MB
-    - empty-sync cost dominates at 100 peers: a round where
-      every peer pulls from ~3 neighbours = ~150 s
-    - full `adhd`, 100 peers, a round every 10 events:
-      ~3.3k rounds x 150 s ~ 6 days + replays 33k x 100 x
-      0.1 s ~ 4 days -> ~10 days (time is not a limit)
+    - flood pulls only where something is new: no empty
+      syncs
     - empty-sync cost may grow with chain size: to check
-- 100 peers:
-    - full `adhd`: ~33 GB disk, ~8 days (upper bound)
-    - 5k slice: ~5 GB disk, ~1.2 days
+- 66 peers, flood (65 replays x ~0.65 s ~ 42 s per event):
+    - 5k slice: ~2.4 days, ~3 GB disk
+    - full `adhd`: ~16 days, ~22 GB disk
 - ceiling: ~400 peers on full `adhd` (disk, 30 GB spare);
   more on smaller slices; time is not a constraint
+
+# References (real P2P, 26/10/05)
+
+- Bitcoin: testnet sample 733 nodes, avg degree 16.6,
+  diameter 5, power-law degrees (TxProbe, arXiv 1812.00942);
+  block propagation median < 1 s, p90 < 10 s, stale < 0.1%
+  (2021+; 1-2% in 2015)
+- Ethereum: avg degree 47, power law gamma ~2.34, 3-4 hops,
+  ~200 ms per transaction (Ethna, arXiv 2010.01373); no data
+- Monero: core-periphery, super-peers (arXiv 2504.17809,
+  2504.15986)
+- Nebula (ProbeLab): DHT crawls every 2 h of IPFS, Ethereum,
+  Filecoin, Polkadot, Celestia; neighbours = k-bucket entries
+  (routing, not data links: caveat); public dataset
+  `baselight.app/u/probelab/dataset/nebula_crawls`
+- Scuttlebutt: follow-graph gossip, closest to a forum (ACM
+  ICN 2019); no topology dataset found
 
 # Races (26/10/05)
 
@@ -163,11 +187,13 @@
       261005-races.md` (readers-writer lock, temps, CAS)
 - [ ] revisit Sizing after the lemmy P2P smoke (replay cost,
   empty-sync cost)
-- [ ] `p2p/topo.py`: ring of 5 clusters -> edges + schedule
+- [ ] Nebula: fetch one crawl with neighbours (baselight),
+  sample a connected 10-node subgraph
+- [ ] `p2p/topo.py`: ring of 6 shapes -> edges + schedule
 - [ ] `p2p/p2p.lua` + edges/schedule/placement file formats
-- [ ] smoke: 5 peers, 1k slice, complete graph, cadence 10
-- [ ] 100 peers, 5k slice: arrangements x cadence
-- [ ] 100 peers, full `adhd`: chosen arrangements
+- [ ] smoke: 5 peers, 1k slice, complete graph, d = 1 min
+- [ ] 66 peers, 5k slice: d = 1 s | 1 min | 1 h
+- [ ] 66 peers, full `adhd`: chosen d
 - [ ] churn and partition runs last (they need reruns)
 
 # Won't do
