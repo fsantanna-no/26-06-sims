@@ -11,10 +11,13 @@
   by the moderator's own key, `--why=<reason>`, amount = 1000
   + likes; restore = unrevoke `--file`; author delete = free
   self-revoke; no votes (not public)
-- freechains: v0.21.0, `main` 5e04aa4 (26/10/03)
+- freechains: v0.21.0 (`--version` does not tell builds apart)
+    - `main` 5e04aa4 (26/10/03): first open run
+    - 260914-tree-trash (installed 26/10/05 11:56): reruns
 
-## OPEN chain, home stream (26/10/05)
+## OPEN chain, home stream, `main` build (26/10/05)
 
+- log: `logs/open-main.log`
 - 33,027 events in 14h50m; zero skip_t, 11 skip_r (revoke of
   an already revoked item), zero clamps
 - 31,422 posts, 170 revokes, 2 restores, 1,277 self-revokes,
@@ -33,8 +36,8 @@
   unlike GitHub (flat 0.21 -> 0.26 s over 94k); sweeps grow
   ~quadratically and take 31,865 s = 60% of the run
     - same shape as GitHub on the old blob build (1.17 s/ev
-      at 36k, 2 h sweeps); suspect the installed `main` build
-      lacks the 260914-tree-trash state: to check
+      at 36k, 2 h sweeps); `main` lacks the 260914-tree-trash
+      state (checked): rerun on tree-trash pending
 - revokes: 0.54% of posts (GitHub 5.1%); all 172 revokes +
   unrevokes signed by the moderators' own keys, in debt
   (open chain)
