@@ -33,4 +33,10 @@ for z in se/*.7z; do
     d=se/$(basename "$z" .7z)
     [ -d "$d" ] || 7z x -y -o"$d" "$z" > /dev/null
 done
+
+# Lemmy pilot: live API, no checksum (lemmy/fetch-lemmy.py)
+for inst in lemmy.dbzer0.com feddit.org; do
+    [ -e "lemmy/$inst-adhd@lemmy.dbzer0.com/.done" ] ||
+        python3 ../lemmy/fetch-lemmy.py "$inst" adhd@lemmy.dbzer0.com
+done
 echo OK
