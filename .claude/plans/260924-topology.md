@@ -204,7 +204,10 @@
     - [x] written, MODE=simple only; `DUMP=1` prints the 108
       links, identical to the diagram's (checked)
     - [ ] MODE=corpus (see Next steps)
-    - [x] settings in one `G` table, no env (26/10/06)
+    - [x] settings in `p2p/config.lua`, table `G`, no env
+      (26/10/06)
+    - [x] `BASE` derived in `config.lua`; tier sizes `_ns`,
+      `_nm`, `_nl` in `topo.lua` (no hardcoded 45)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -233,8 +236,8 @@
 - simple test (artificial posts):
     - `cd p2p && lua5.4 p2p.lua > logs/simple-N.log 2>&1`
     - ~2 min for 10 actions; ends with `== PASS` or `== FAIL`
-- knobs: edit the `G` table at the top of `p2p.lua` (no env),
-  one comment per field
+- knobs: edit `p2p/config.lua` (table `G`, no env), one
+  comment per field
     - `MODE`, `N_ACT` (10), `GAP` (3600), `D` (60), `RMAX` (40),
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
@@ -243,8 +246,9 @@
       fails= elapsed=`
     - `== END ...`: rounds median/max, pulls, skips, fails;
       peers whose `list order` differs; `reps` mismatches
-- files: topology `p2p/topo.lua`, diagram `p2p/hubs50.dia`,
-  peers `p2p/.freechains-p2p-<mode>/pNN` (ignored), logs
+- files: settings `p2p/config.lua`, topology `p2p/topo.lua`,
+  diagram `p2p/hubs50.dia`, peers
+  `p2p/.freechains-p2p-<mode>/pNN` (ignored), logs
   `p2p/logs/` (ignored); BASE is wiped on start
 - race test: `p2p/race.sh [senders] [posts] [hub-posts]`, env
   `TMP` (fresh dir), `ROUNDS` (3), `PORT` (18399)

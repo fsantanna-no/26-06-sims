@@ -16,25 +16,13 @@
 -- source's HEAD.
 -- MODE=simple: artificial inline posts (the only mode so far).
 -- SINGLE RUN: G.BASE is wiped on start.
--- Settings: edit the G table below (no env).
+-- Settings: edit config.lua (table G, no env).
 
 -------------------------------------------------------------------------------
 -- config
 
-local G = {
-    MODE  = 'simple',       -- simple | corpus (not yet)
-    N_ACT = 10,             -- simple: number of actions
-    GAP   = 3600,           -- simple: chain secs between actions
-    D     = 60,             -- chain secs per round
-    RMAX  = 40,             -- max rounds per action
-    LANES = 6,              -- parallel lanes per step
-    SEED  = 1,              -- random seed
-    DUMP  = false,          -- print the 108 links and exit
-    ALIAS = '/simple',      -- chain name
-    BASE  = nil,            -- peers dir (nil: ./.freechains-p2p-<MODE>)
-    T0    = 1700000000,     -- chain time of the first action
-}
-G.BASE = G.BASE or ('./.freechains-p2p-' .. G.MODE)
+local DIR = arg[0]:match("^(.*)/") or "."
+local G = dofile(DIR .. "/config.lua")
 
 math.randomseed(G.SEED)
 
@@ -56,10 +44,10 @@ end
 -- topology: hubs-59 (fixed, as drawn in hubs50.dia)
 -- peer ids: S01-S05 = 0-4, M01-M09 = 5-13, leaves L14-L58 = 14-58
 
-local TOPO = dofile((arg[0]:match("^(.*)/") or ".") .. "/topo.lua")
+local TOPO = dofile(DIR .. "/topo.lua")
 
 
-local NS, NM = 5, 9
+local NS, NM, NL = TOPO._ns, TOPO._nm, TOPO._nl
 local SUP, MID, LEAF = {}, {}, {}   -- peer ids, by tier
 local NAME, TIER, HOME = {}, {}, {} -- HOME: leaf -> mid index (0-based)
 local EDGES, ADJ, MIDS = {}, {}, {} -- MIDS: leaf -> mid ids, own first
@@ -81,7 +69,7 @@ local function link (a, b, kind)
     ADJ[b][#ADJ[b]+1] = a
 end
 
-local N = NS + NM + 45
+local N = NS + NM + NL
 for p = 0, N-1 do
     ADJ[p] = {}
     if p < NS then
@@ -96,6 +84,7 @@ local ID = {}
 for p = 0, N-1 do ID[NAME[p]] = p end
 
 for p = 0, N-1 do
+    assert(TOPO[NAME[p]], "topo: missing " .. NAME[p])
     for _, x in ipairs(TOPO[NAME[p]]) do
         local q = ID[x]
         local kind = TIER[p] .. TIER[q]

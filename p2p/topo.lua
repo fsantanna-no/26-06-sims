@@ -9,6 +9,9 @@
 -- on the lower tier); a leaf's first mid is its own, a second
 -- mid is the neighbouring one, an L entry is a sibling
 return {
+    _ns = 5,                -- supers S01-S05
+    _nm = 9,                -- mids M01-M09
+    _nl = 45,               -- leaves L14-L58
     S01 = {},
     S02 = { 'S01' },
     S03 = { 'S01', 'S02' },
