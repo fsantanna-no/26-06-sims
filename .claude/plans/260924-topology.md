@@ -243,7 +243,32 @@
         - post and sync times, ff vs mg, min/avg/max
         - mock harness (fake freechains/git): 20 actions,
           constraints hold, drain 2 waves, PASS
-    - [ ] simple test with waves, 20 actions (run by the user)
+    - [x] simple test with waves, 20 actions (26/10/06):
+      FAIL (`p2p/logs/waves-1.log`)
+        - 61 s (old loop 130 s); 10 waves every action
+        - syncs 0.08-0.44 s, grow with chain size; posts
+          0.06-0.13 s; 11 of 1,158 syncs are merges
+        - all 59: same HEAD, all 20 posts
+        - `list order` differs on 4 peers, only at posts
+          17-20 (the merged ones)
+        - fresh clones of p00, p12, p39 all agree, but 55
+          live peers (p00 too) hold another order -> cached
+          order depends on the sync path (freechains
+          tree-trash), not on the scheduling
+        - [x] same schedule, tasks one at a time (scratch
+          copy): FAIL too, 3 peers differ -> NOT a race
+            - same pulls (1,158), same merges (11), drain 2
+            - 290 s vs 61 s in parallel (4.8x from lanes)
+        - cause: freechains (tree-trash) cached order depends
+          on the sync path; a fresh clone recomputes another
+          -> upstream bug, for the freechains repo (not here)
+        - old loop PASSed (k = 10): likely luck, same risk
+        - user rerun: identical (same 4 peers): fixed repro
+          for the upstream fix
+        - sync growth: ff avg 0.10-0.13 s up to act 11, 0.25
+          s at act 12 (first merges), 0.41 s at act 20
+            - [ ] 100 actions: does it level off? (risk for
+              the 33k corpus)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
