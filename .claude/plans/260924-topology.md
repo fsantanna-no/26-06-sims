@@ -208,6 +208,8 @@
       (26/10/06)
     - [x] `BASE` derived in `config.lua`; tier sizes `_ns`,
       `_nm`, `_nl` in `topo.lua` (no hardcoded 45)
+    - [x] abort on the first failed pull (none expected);
+      no fails counter
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -223,6 +225,7 @@
 - [ ] 59 peers, 5k slice: calibrate d
 - [ ] 59 peers, full `adhd`: chosen d
 - [ ] partitions: 2-3 mids x 1 day | 8 days
+    - 8 days: hard forks expected -> count them, not abort
 - [ ] later, standalone: small-world, nebula, scale-free
   (larger, alone)
 
@@ -243,9 +246,11 @@
 - `DUMP = true`: print the 108 links and exit
 - output lines:
     - `== act N  <leaf> -> <mid>  rounds=R ok  pulls= skips=
-      fails= elapsed=`
-    - `== END ...`: rounds median/max, pulls, skips, fails;
+      elapsed=`
+    - `== END ...`: rounds median/max, pulls, skips;
       peers whose `list order` differs; `reps` mismatches
+    - a failed pull aborts: `step <tag> : pull <to> <- <from>
+      : rc= <err>`
 - files: settings `p2p/config.lua`, topology `p2p/topo.lua`,
   diagram `p2p/hubs50.dia`, peers
   `p2p/.freechains-p2p-<mode>/pNN` (ignored), logs

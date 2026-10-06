@@ -158,8 +158,7 @@ local function pull (to, from, ts)
     return string.format("pull %d %d %d", to, from, ts)
 end
 
-local STATS = { pulls=0, skips=0, fails=0, steps=0, wall=0 }
-local FAILS = {}
+local STATS = { pulls=0, skips=0, steps=0, wall=0 }
 
 --[[
 -- Run one step: jobs (lists of pull lines, one job per written
@@ -169,9 +168,11 @@ local FAILS = {}
 --  - jobs [table]: { {line, ...}, ... }
 --  - tag  [string]: step name, for the logs
 -- Outputs:
---  - none (updates STATS, FAILS)
+--  - none (updates STATS)
 -- Errors:
 --  - "step <tag> : missing status": a pull left no status line
+--  - "step <tag> : pull <to> <- <from> : rc=<rc> <err>": a pull
+--    failed (none expected: abort)
 -- Callers:
 --  - action, round [p2p.lua]
 --]]
@@ -232,9 +233,8 @@ local function run (jobs, tag)
                 elseif rc == '0' then
                     STATS.pulls = STATS.pulls + 1
                 else
-                    STATS.fails = STATS.fails + 1
-                    local k = (err ~= '' and err or ('rc=' .. rc))
-                    FAILS[k] = (FAILS[k] or 0) + 1
+                    error(string.format("step %s : pull %s <- %s : rc=%s %s",
+                        tag, NAME[tonumber(to)], NAME[tonumber(from)], rc, err))
                 end
             end
             fh:close()
@@ -442,9 +442,9 @@ for a = 1, G.N_ACT do
     -- 2-3 until converged
     local r, ok = rounds(ts)
     R[#R+1] = r
-    print(string.format("== act %06d  %s->%s  rounds=%02d %s  pulls=%03d skips=%04d fails=%02d  elapsed=%02ds",
+    print(string.format("== act %06d  %s->%s  rounds=%02d %s  pulls=%03d skips=%04d  elapsed=%02ds",
         a, NAME[l], NAME[MID[HOME[l]+1]], r, ok and 'ok' or 'NOT CONVERGED',
-        STATS.pulls, STATS.skips, STATS.fails, math.floor(now() - t0)))
+        STATS.pulls, STATS.skips, math.floor(now() - t0)))
 end
 
 -------------------------------------------------------------------------------
@@ -471,12 +471,9 @@ for l in pairs(AUTH) do
     bad_r = bad_r + same("reps member " .. KEYS .. "/" .. NAME[l] .. ".pub")
 end
 table.sort(R)
-local fs = {}
-for k, v in pairs(FAILS) do fs[#fs+1] = k .. ' x' .. v end
-print(string.format("== END actions=%d  rounds median=%d max=%d  pulls=%d skips=%d fails=%d  steps=%d step-wall=%.0fs  elapsed=%.0fs",
-    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls, STATS.skips, STATS.fails,
+print(string.format("== END actions=%d  rounds median=%d max=%d  pulls=%d skips=%d  steps=%d step-wall=%.0fs  elapsed=%.0fs",
+    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls, STATS.skips,
     STATS.steps, STATS.wall, now() - t0))
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, (function () local n = 0 for _ in pairs(AUTH) do n = n + 1 end return n end)()))
-print("== END failures: " .. (#fs > 0 and table.concat(fs, ' | ') or 'none'))
 print(bad_o == 0 and bad_r == 0 and "== PASS" or "== FAIL")
