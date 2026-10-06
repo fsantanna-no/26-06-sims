@@ -1,19 +1,22 @@
 #!/usr/bin/env lua5.4
 
--- P2P replay on hubs-59 (see `hubs50.dia`): 5 supers (fully
--- connected), 9 mids M01..M09 (each on its 2 nearest supers;
--- Mi carries i leaves), 45 leaves; edge leaves also on the
--- neighbouring mid; sibling links in fans of 4+ leaves.
+-- P2P replay on hubs-59 (see `hubs50.dia`).
+-- 5 supers, fully connected.
+-- 9 mids M01..M09, each on its 2 nearest supers.
+-- Mi carries i leaves, 45 leaves in all.
+-- Edge leaves also link to the neighbouring mid.
+-- Sibling links in fans of 4+ leaves.
 -- Loop per action:
---  1. a leaf acts; its mid pulls it
+--  1. a leaf acts, and its mid pulls it
 --  2. leaves pull from their mid(s) + random super pairs +
 --     random sibling pairs
 --  3. random mid/super pairs (matching on M-S and S-S links)
 --  repeat 2-3 until every HEAD agrees (or RMAX rounds)
--- Each step runs in LANES parallel lanes, one job per written
--- peer (one writer per peer; sources are only read by `git
--- fetch`). A pull is skipped when the receiver already has the
--- source's HEAD.
+-- Each step runs in LANES parallel lanes.
+-- One job per written peer, so one writer per peer.
+-- Sources are only read, by `git fetch`.
+-- A pull is skipped when the receiver already has the source's
+-- HEAD.
 -- MODE=simple: artificial inline posts (the only mode so far).
 -- SINGLE RUN: G.BASE is wiped on start.
 -- Settings: edit config.lua (table G, no env).
@@ -161,9 +164,10 @@ end
 local STATS = { pulls=0, skips=0, steps=0, wall=0 }
 
 --[[
--- Run one step: jobs (lists of pull lines, one job per written
--- peer or pair) spread over LANES lanes, longest first to the
--- least loaded lane; waits for all; tallies the status lines.
+-- Run one step.
+-- Jobs (lists of pull lines, one per written peer or pair) go to
+-- LANES lanes, longest first to the least loaded.
+-- Waits for all, then tallies the status lines.
 -- Inputs:
 --  - jobs [table]: { {line, ...}, ... }
 --  - tag  [string]: step name, for the logs
@@ -305,9 +309,10 @@ for _, e in ipairs(EDGES) do
 end
 
 --[[
--- Step 2: leaves pull from their mid(s); random super pairs and
--- random sibling pairs exchange. A leaf in a sibling pair shares
--- one job with its partner (one writer per peer).
+-- Step 2: leaves pull from their mid(s).
+-- Random super pairs and random sibling pairs exchange.
+-- A leaf in a sibling pair shares one job with its partner (one
+-- writer per peer).
 -- Inputs:
 --  - ts [integer]: virtual time
 -- Outputs:
@@ -386,11 +391,8 @@ end
 
 os.execute("rm -rf " .. G.BASE)
 os.execute("mkdir -p " .. KEYS)
-print(string.format("== hubs-59: peers=%d links=%d (SS %d, SM %d, LM %d, LX %d, LL %d) lanes=%d",
-    N, #EDGES, #L_SS, #L_MS - #L_SS, #LEAF, #CROSS, #L_LL, G.LANES))
-
-print(exec("freechains --root=" .. root(0) .. " --now=" .. G.T0 ..
-    " chains add '" .. G.ALIAS .. "' init"))
+exec("freechains --root=" .. root(0) .. " --now=" .. G.T0 ..
+    " chains add '" .. G.ALIAS .. "' init")
 local made, layer = { [0] = true }, { 0 }
 while #layer > 0 do
     local sh, next = {}, {}
@@ -433,7 +435,8 @@ for a = 1, G.N_ACT do
     local ts = G.T0 + a*G.GAP
     local l  = LEAF[math.random(#LEAF)]
     AUTH[l]  = true
-    -- 1. the leaf acts; its own mid pulls it
+    local ta, pa = now(), STATS.pulls
+    -- 1. the leaf acts, and its own mid pulls it
     local h = exec("freechains --root=" .. root(l) .. " --now=" .. ts ..
         " chain '" .. G.ALIAS .. "' post --sign=" .. KEYS .. "/" .. NAME[l] ..
         " inline 'simple " .. a .. " by " .. NAME[l] .. "'")
@@ -442,9 +445,10 @@ for a = 1, G.N_ACT do
     -- 2-3 until converged
     local r, ok = rounds(ts)
     R[#R+1] = r
-    print(string.format("== act %06d  %s->%s  rounds=%02d %s  pulls=%03d skips=%04d  elapsed=%02ds",
-        a, NAME[l], NAME[MID[HOME[l]+1]], r, ok and 'ok' or 'NOT CONVERGED',
-        STATS.pulls, STATS.skips, math.floor(now() - t0)))
+    assert(ok, "act " .. a .. " : not converged after " .. r .. " rounds")
+    print(string.format(". %5d  %s->%s  rounds=%02d  pulls=%02d  %ds/%ds",
+        a, NAME[l], NAME[MID[HOME[l]+1]], r, STATS.pulls - pa,
+        math.floor(now() - ta), math.floor(now() - t0)))
 end
 
 -------------------------------------------------------------------------------
@@ -471,8 +475,8 @@ for l in pairs(AUTH) do
     bad_r = bad_r + same("reps member " .. KEYS .. "/" .. NAME[l] .. ".pub")
 end
 table.sort(R)
-print(string.format("== END actions=%d  rounds median=%d max=%d  pulls=%d skips=%d  steps=%d step-wall=%.0fs  elapsed=%.0fs",
-    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls, STATS.skips,
+print(string.format("== END actions=%d  rounds median=%d max=%d  pulls=%d  steps=%d step-wall=%.0fs  elapsed=%.0fs",
+    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls,
     STATS.steps, STATS.wall, now() - t0))
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, (function () local n = 0 for _ in pairs(AUTH) do n = n + 1 end return n end)()))

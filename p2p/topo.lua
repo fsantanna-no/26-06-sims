@@ -1,13 +1,16 @@
--- hubs-59 topology (as drawn in hubs50.dia): 5 supers fully
--- connected, 9 mids on their 2 nearest supers (Mi carries i
--- leaves), 45 leaves; edge leaves also on the neighbouring mid;
--- sibling links in fans of 4+ leaves.
--- peer ids (in p2p.lua): S01-S05 = 0-4, M01-M09 = 5-13,
--- leaves L14-L58 = 14-58
+-- hubs-59 topology (as drawn in hubs50.dia).
+-- 5 supers, fully connected.
+-- 9 mids, each on its 2 nearest supers (Mi carries i leaves).
+-- 45 leaves.
+-- Edge leaves also link to the neighbouring mid.
+-- Sibling links in fans of 4+ leaves.
+-- Peer ids (in p2p.lua): S01-S05 = 0-4, M01-M09 = 5-13,
+-- leaves L14-L58 = 14-58.
 
--- each peer and the peers it links to (each link listed once,
--- on the lower tier); a leaf's first mid is its own, a second
--- mid is the neighbouring one, an L entry is a sibling
+-- Each peer and the peers it links to.
+-- Each link is listed once, on the lower tier.
+-- A leaf's first mid is its own, a second mid is the neighbour.
+-- An L entry is a sibling.
 return {
     _ns = 5,                -- supers S01-S05
     _nm = 9,                -- mids M01-M09

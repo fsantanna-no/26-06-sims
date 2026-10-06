@@ -210,6 +210,9 @@
       `_nm`, `_nl` in `topo.lua` (no hardcoded 45)
     - [x] abort on the first failed pull (none expected);
       no fails counter
+    - [x] comments without `;`, one phrase per line
+    - [x] shorter output: `.` lines, pulls per action,
+      cur/tot secs; no setup line, `ok` or skips
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -245,10 +248,14 @@
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
-    - `== act N  <leaf> -> <mid>  rounds=R ok  pulls= skips=
-      elapsed=`
-    - `== END ...`: rounds median/max, pulls, skips;
-      peers whose `list order` differs; `reps` mismatches
+    - `. N  <leaf>-><mid>  rounds=R  pulls=P  cur/tot`
+        - rounds: until all 59 HEADs agree (simple mode)
+        - pulls: real syncs for this action (58 expected)
+        - cur/tot: wall secs of this action / since start
+        - not converged after RMAX rounds: abort
+    - `== END ...`: rounds median/max, total pulls, steps,
+      times; peers whose `list order` differs; `reps`
+      mismatches
     - a failed pull aborts: `step <tag> : pull <to> <- <from>
       : rc= <err>`
 - files: settings `p2p/config.lua`, topology `p2p/topo.lua`,
@@ -271,6 +278,8 @@
     - kinds as `lemmy-simple.lua`: post, remove (revoke
       `--why`), restore (unrevoke `--file`), delete (free
       self-revoke); ban/addmod counted only
+    - final drain: rounds after the last action until all
+      HEADs agree, reported (convergence metric)
     - rounds per action: k = (gap to next action) / D, early
       stop on equal HEADs, cap RMAX
     - sweep every WINDOW actions on every peer (in lanes)
