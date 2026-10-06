@@ -396,8 +396,8 @@
           for the upstream fix
         - sync growth: ff avg 0.10-0.13 s up to act 11, 0.25
           s at act 12 (first merges), 0.41 s at act 20
-            - [ ] 100 actions: does it level off? (risk for
-              the 33k corpus)
+            - [ ] superseded: see Next steps 2 (sync
+              slowdown with many forks)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -410,9 +410,9 @@
         - same `list order` on all 59 peers, same `reps` for
           all 9 authors
         - ~10 s per action (estimate was 15-25 s)
-- [ ] 59 peers, 5k slice: calibrate d
-- [ ] 59 peers, full `adhd`: chosen d
-- [ ] partitions: 2-3 mids x 1 day | 8 days
+- [ ] 59 peers, 5k slice (Next steps 7)
+- [ ] 59 peers, full `adhd` (Next steps 8)
+- [ ] partitions: 2-3 mids x 1 day | 8 days (Next steps 9)
     - 8 days: hard forks expected -> count them, not abort
 - [ ] later, standalone: small-world, nebula, scale-free
   (larger, alone)
@@ -465,25 +465,46 @@
 # Next steps
 
 - 1. [x] fork metric (`miss`, forks, merges in DAG)
-- 2. MODE=corpus in `p2p.lua`
-    - input: a `lemmy-events.py` TSV (`SRC=`, as
+- 2. [ ] BLOCKER: sync slowdown with many forks
+    - seen: `p2p/logs/tsync-1.log` (ratio 2, ~90% forks):
+      act 11 ff avg 1.8 s; act 19 ff avg 72 s, max 136 s;
+      act 19 took 693 s
+    - oracle runs (few forks): ~0.1-0.4 s per sync
+    - [ ] log syncs per action against forks in the DAG
+    - [ ] minimal repro: N concurrent posts, merged, time
+      one `sync recv` as N grows
+    - [ ] same repro on `main` vs `261006-bug-winner`: did
+      the fix add the cost (state reads per inner fork)?
+    - [ ] if confirmed: plan in the freechains repo
+- 3. [ ] sync rule, decisions
+    - [ ] T.sync per app class, with sources a reader
+      accepts (IRC/Matrix, ActivityPub push, NNTP feeds,
+      UUCP batches)
+    - [ ] two designs: polling (blind, now) and push
+      (sync on news, the old oracle); restore push as a
+      `config.lua` option and report both
+- 4. [ ] corpus gaps: refetch lemmy, github, wiki data;
+  medians and percentiles into Sync policy
+- 5. [ ] MODE=corpus in `p2p.lua`
+    - input: a `lemmy-events.py` TSV (`SRC`, as
       `lemmy-simple.lua`)
+    - T.action per action = real gap to the next event
     - authors placed uniformly on the 45 leaves (sticky,
       `SEED`); moderators too
     - kinds as `lemmy-simple.lua`: post, remove (revoke
       `--why`), restore (unrevoke `--file`), delete (free
       self-revoke); ban/addmod counted only
-    - final drain: waves after the last action until every
-      peer holds every action, reported (convergence metric)
-    - waves per action: K = (gap to next action) / D, early
-      stop when nothing is missing
+    - final drain until every peer holds every action
     - sweep every WINDOW actions on every peer (in waves)
-- 3. smoke: `adhd` first 500 events, D = 300 (5 min)
-- 4. 5k slice: calibrate D for ~10-20% forks (tpd-21:
-  14-18%)
-- 5. full `adhd` (~1-2 days est.)
-- 6. partitions: cut M01, M05, M09 for 1 day, then 8 days
-- 7. results: `p2p/RESULTS.md`
+- 6. [ ] smoke: `adhd` first 500 events, mock first (forks),
+  then real
+- 7. [ ] 5k slice: forks at the chosen T.sync, plus a T.sync
+  sweep (mock)
+- 8. [ ] full `adhd` (time depends on step 2)
+- 9. [ ] partitions: cut M01, M05, M09 for 1 day, then 8
+  days; hard forks counted, not aborted
+- 10. [ ] results: `p2p/RESULTS.md` (fork curve by
+  T.action / T.sync, per corpus; push vs polling)
 
 # Won't do
 
