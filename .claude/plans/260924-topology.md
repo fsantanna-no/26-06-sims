@@ -204,6 +204,7 @@
     - [x] written, MODE=simple only; `DUMP=1` prints the 108
       links, identical to the diagram's (checked)
     - [ ] MODE=corpus (see Next steps)
+    - [x] settings in one `G` table, no env (26/10/06)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -230,13 +231,13 @@
       has ~1181 lines (main: 89)
 - ONE run at a time (CPU-bound; timings)
 - simple test (artificial posts):
-    - `cd p2p && N_ACT=10 lua5.4 p2p.lua > logs/simple-N.log
-      2>&1`
+    - `cd p2p && lua5.4 p2p.lua > logs/simple-N.log 2>&1`
     - ~2 min for 10 actions; ends with `== PASS` or `== FAIL`
-- knobs (env): `N_ACT` (10), `GAP` chain secs between actions
-  (3600), `D` chain secs per round (60), `RMAX` (40), `LANES`
-  (6), `SEED` (1), `BASE` (`./.freechains-p2p-simple`)
-- `DUMP=1 lua5.4 p2p.lua`: print the 108 links and exit
+- knobs: edit the `G` table at the top of `p2p.lua` (no env),
+  one comment per field
+    - `MODE`, `N_ACT` (10), `GAP` (3600), `D` (60), `RMAX` (40),
+      `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
+- `DUMP = true`: print the 108 links and exit
 - output lines:
     - `== act N  <leaf> -> <mid>  rounds=R ok  pulls= skips=
       fails= elapsed=`

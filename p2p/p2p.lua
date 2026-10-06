@@ -15,37 +15,28 @@
 -- fetch`). A pull is skipped when the receiver already has the
 -- source's HEAD.
 -- MODE=simple: artificial inline posts (the only mode so far).
--- SINGLE RUN: BASE is wiped on start.
+-- SINGLE RUN: G.BASE is wiped on start.
+-- Settings: edit the G table below (no env).
 
 -------------------------------------------------------------------------------
 -- config
 
-local function env (name, default)
-    local v = os.getenv(name)
-    if v == nil then
-        return default
-    elseif v == 'true' then
-        return true
-    elseif v == 'false' or v == 'nil' then
-        return v == 'true'
-    else
-        return tonumber(v) or v
-    end
-end
+local G = {
+    MODE  = 'simple',       -- simple | corpus (not yet)
+    N_ACT = 10,             -- simple: number of actions
+    GAP   = 3600,           -- simple: chain secs between actions
+    D     = 60,             -- chain secs per round
+    RMAX  = 40,             -- max rounds per action
+    LANES = 6,              -- parallel lanes per step
+    SEED  = 1,              -- random seed
+    DUMP  = false,          -- print the 108 links and exit
+    ALIAS = '/simple',      -- chain name
+    BASE  = nil,            -- peers dir (nil: ./.freechains-p2p-<MODE>)
+    T0    = 1700000000,     -- chain time of the first action
+}
+G.BASE = G.BASE or ('./.freechains-p2p-' .. G.MODE)
 
-local MODE  = env('MODE',  'simple')
-local N_ACT = env('N_ACT', 10)          -- simple: number of actions
-local GAP   = env('GAP',   3600)        -- simple: chain secs between actions
-local D     = env('D',     60)          -- chain secs per round
-local RMAX  = env('RMAX',  40)          -- max rounds per action
-local LANES = env('LANES', 6)
-local SEED  = env('SEED',  1)
-local DUMP  = env('DUMP',  false)       -- print the edges and exit
-local ALIAS = env('ALIAS', '/simple')
-local BASE  = env('BASE',  './.freechains-p2p-' .. MODE)
-local T0    = env('T0',    1700000000)
-
-math.randomseed(SEED)
+math.randomseed(G.SEED)
 
 -------------------------------------------------------------------------------
 -- helpers (as lemmy-p2p)
@@ -123,7 +114,7 @@ for p = 0, N-1 do
     end
 end
 
-if DUMP then
+if G.DUMP then
     for _, e in ipairs(EDGES) do
         print(e[3], NAME[e[1]], NAME[e[2]])
     end
@@ -133,9 +124,9 @@ end
 -------------------------------------------------------------------------------
 -- peers on disk
 
-BASE = exec("realpath -m " .. BASE)
-local KEYS  = BASE .. '/keys'
-local CHAIN = string.sub(ALIAS, 2)
+G.BASE = exec("realpath -m " .. G.BASE)
+local KEYS  = G.BASE .. '/keys'
+local CHAIN = string.sub(G.ALIAS, 2)
 
 --[[
 -- Root dir of a peer.
@@ -147,7 +138,7 @@ local CHAIN = string.sub(ALIAS, 2)
 --  - dir, fc, main chunk [p2p.lua]
 --]]
 local function root (p)
-    return string.format("%s/p%02d", BASE, p)
+    return string.format("%s/p%02d", G.BASE, p)
 end
 
 --[[
@@ -201,47 +192,47 @@ local function run (jobs, tag)
     end
     table.sort(jobs, function (a, b) return #a > #b end)
     local lanes, load = {}, {}
-    for i = 1, LANES do lanes[i], load[i] = {}, 0 end
+    for i = 1, G.LANES do lanes[i], load[i] = {}, 0 end
     for _, job in ipairs(jobs) do
         local best = 1
-        for i = 2, LANES do
+        for i = 2, G.LANES do
             if load[i] < load[best] then best = i end
         end
         for _, l in ipairs(job) do table.insert(lanes[best], l) end
         load[best] = load[best] + #job
     end
-    local st = BASE .. '/status'
+    local st = G.BASE .. '/status'
     local sh = { "set +e",
         -- pull <to> <from> <ts>: skip if <to> has <from>'s HEAD
         "pull () {",
-        "  local T=$(printf '" .. BASE .. "/p%02d' $1) F=$(printf '" .. BASE .. "/p%02d' $2)",
+        "  local T=$(printf '" .. G.BASE .. "/p%02d' $1) F=$(printf '" .. G.BASE .. "/p%02d' $2)",
         "  local h=$(git -C $F/chains/" .. CHAIN .. "/ rev-parse HEAD)",
         "  if git -C $T/chains/" .. CHAIN .. "/ cat-file -e $h^{commit} 2>/dev/null; then",
         "    echo \"skip $1 $2 0\" >> " .. st .. ".$LANE",
         "  else",
-        "    out=$(freechains --root=$T --now=$3 chain " .. ALIAS ..
+        "    out=$(freechains --root=$T --now=$3 chain " .. G.ALIAS ..
             " sync recv $F/chains/" .. CHAIN .. "/ 2>&1); rc=$?",
         "    echo \"pull $1 $2 $rc $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" >> " .. st .. ".$LANE",
         "  fi",
         "}",
         "rm -f " .. st .. ".*" }
     local n = 0
-    for i = 1, LANES do
+    for i = 1, G.LANES do
         if #lanes[i] > 0 then
             sh[#sh+1] = "( LANE=" .. i .. " ; " .. table.concat(lanes[i], " ; ") .. " ) &"
             n = n + #lanes[i]
         end
     end
     sh[#sh+1] = "wait"
-    local f = io.open(BASE .. '/step.sh', 'w')
+    local f = io.open(G.BASE .. '/step.sh', 'w')
     f:write(table.concat(sh, "\n") .. "\n")
     f:close()
     local t0 = now()
-    os.execute("bash " .. BASE .. "/step.sh")
+    os.execute("bash " .. G.BASE .. "/step.sh")
     STATS.wall  = STATS.wall + (now() - t0)
     STATS.steps = STATS.steps + 1
     local seen = 0
-    for i = 1, LANES do
+    for i = 1, G.LANES do
         local fh = io.open(st .. '.' .. i)
         if fh then
             for l in fh:lines() do
@@ -389,28 +380,28 @@ end
 --  - main chunk [p2p.lua]
 --]]
 local function rounds (ts)
-    for r = 1, RMAX do
-        local t = ts + r*D
+    for r = 1, G.RMAX do
+        local t = ts + r*G.D
         step2(t)
         step3(t)
         if heads() then
             return r, true
         end
     end
-    return RMAX, false
+    return G.RMAX, false
 end
 
 -------------------------------------------------------------------------------
 -- setup: S01 inits, the others clone from an already created
 -- neighbour (BFS order, one BFS layer per parallel step)
 
-os.execute("rm -rf " .. BASE)
+os.execute("rm -rf " .. G.BASE)
 os.execute("mkdir -p " .. KEYS)
 print(string.format("== hubs-59: peers=%d links=%d (SS %d, SM %d, LM %d, LX %d, LL %d) lanes=%d",
-    N, #EDGES, #L_SS, #L_MS - #L_SS, #LEAF, #CROSS, #L_LL, LANES))
+    N, #EDGES, #L_SS, #L_MS - #L_SS, #LEAF, #CROSS, #L_LL, G.LANES))
 
-print(exec("freechains --root=" .. root(0) .. " --now=" .. T0 ..
-    " chains add '" .. ALIAS .. "' init"))
+print(exec("freechains --root=" .. root(0) .. " --now=" .. G.T0 ..
+    " chains add '" .. G.ALIAS .. "' init"))
 local made, layer = { [0] = true }, { 0 }
 while #layer > 0 do
     local sh, next = {}, {}
@@ -420,16 +411,16 @@ while #layer > 0 do
                 made[q] = true
                 next[#next+1] = q
                 sh[#sh+1] = "freechains --root=" .. root(q) ..
-                    " chains add '" .. ALIAS .. "' clone " .. dir(p) ..
+                    " chains add '" .. G.ALIAS .. "' clone " .. dir(p) ..
                     " > /dev/null 2>&1 &"
             end
         end
     end
     if #sh > 0 then
-        local f = io.open(BASE .. '/clone.sh', 'w')
+        local f = io.open(G.BASE .. '/clone.sh', 'w')
         f:write(table.concat(sh, "\n") .. "\nwait\n")
         f:close()
-        os.execute("bash " .. BASE .. "/clone.sh")
+        os.execute("bash " .. G.BASE .. "/clone.sh")
     end
     layer = next
 end
@@ -444,27 +435,27 @@ end
 -------------------------------------------------------------------------------
 -- simple test: N_ACT artificial posts, each followed by rounds
 
-assert(MODE == 'simple', "mode " .. MODE .. " : not yet")
+assert(G.MODE == 'simple', "mode " .. G.MODE .. " : not yet")
 
 local R = {}
 local AUTH = {}
 local t0 = now()
-for a = 1, N_ACT do
-    local ts = T0 + a*GAP
+for a = 1, G.N_ACT do
+    local ts = G.T0 + a*G.GAP
     local l  = LEAF[math.random(#LEAF)]
     AUTH[l]  = true
     -- 1. the leaf acts; its own mid pulls it
     local h = exec("freechains --root=" .. root(l) .. " --now=" .. ts ..
-        " chain '" .. ALIAS .. "' post --sign=" .. KEYS .. "/" .. NAME[l] ..
+        " chain '" .. G.ALIAS .. "' post --sign=" .. KEYS .. "/" .. NAME[l] ..
         " inline 'simple " .. a .. " by " .. NAME[l] .. "'")
     assert(h:match('^%x+$'), NAME[l] .. ' : post : ' .. h)
     run({ { pull(MID[HOME[l]+1], l, ts) } }, '1')
     -- 2-3 until converged
     local r, ok = rounds(ts)
     R[#R+1] = r
-    print(string.format("== act %2d  %-4s -> %-3s  rounds=%2d %s  pulls=%d skips=%d fails=%d  elapsed=%.0fs",
+    print(string.format("== act %06d  %s->%s  rounds=%02d %s  pulls=%03d skips=%04d fails=%02d  elapsed=%02ds",
         a, NAME[l], NAME[MID[HOME[l]+1]], r, ok and 'ok' or 'NOT CONVERGED',
-        STATS.pulls, STATS.skips, STATS.fails, now() - t0))
+        STATS.pulls, STATS.skips, STATS.fails, math.floor(now() - t0)))
 end
 
 -------------------------------------------------------------------------------
@@ -474,7 +465,7 @@ local function same (cmd)
     local ref, bad = nil, 0
     for p = 0, N-1 do
         local out = exec("freechains --root=" .. root(p) .. " chain '" ..
-            ALIAS .. "' " .. cmd)
+            G.ALIAS .. "' " .. cmd)
         if ref == nil then
             ref = out
         elseif out ~= ref then
@@ -494,7 +485,7 @@ table.sort(R)
 local fs = {}
 for k, v in pairs(FAILS) do fs[#fs+1] = k .. ' x' .. v end
 print(string.format("== END actions=%d  rounds median=%d max=%d  pulls=%d skips=%d fails=%d  steps=%d step-wall=%.0fs  elapsed=%.0fs",
-    N_ACT, R[(#R+1)//2], R[#R], STATS.pulls, STATS.skips, STATS.fails,
+    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls, STATS.skips, STATS.fails,
     STATS.steps, STATS.wall, now() - t0))
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, (function () local n = 0 for _ in pairs(AUTH) do n = n + 1 end return n end)()))
