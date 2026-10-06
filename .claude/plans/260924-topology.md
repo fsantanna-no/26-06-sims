@@ -73,6 +73,87 @@
 - `p2p/p2p.lua` reusing each corpus event stream; single-peer
   drivers untouched
 
+# Sync policy (26/10/06, open)
+
+- concern: a target fork share (15-20%, 0%) is arbitrary;
+  the fork share is an OUTCOME of how often peers sync
+- tpd-21 gives no reason for its numbers (verbatim):
+    - "For the newsgroup, we use N=15 and M=5, which
+      represents a larger number of peers with few
+      interconnections to stress the local-first nature of
+      the protocol."
+    - "For the chat, we use N=5 and M=3, which represents a
+      smaller number of peers with more interconnections."
+    - "We found a ratio of 18% for the chat and 14% for the
+      newsgroup, which confirms that the simulation achieves
+      a reasonable level of asynchrony."
+    - its model has no time: after each message, sync with
+      M random peers; forks come from M < N
+- real gaps between actions (p10 / median / p90 / mean):
+    - chat, wikimedia FULL: 166k msgs, 2.2 y:
+      2 s / 13 s / 99 s / 6.9 min
+        - 10k slice: 3 s / 12 s / 117 s / 12 min
+    - usenet, comp FULL (`yyy.mbox`): 25k dated, 25.9 y:
+      20 s / 43 min / 21 h / 9.0 h
+        - 25,068 of 35,196 `Date:` lines parse (71%)
+        - 10k slice: 5.9 min / 2.7 h / 19 h / 9.1 h
+    - SE vegetarianism (`data/se`, fetched 26/10/06), 7.1 y:
+        - posts: 2,257: 4.5 min / 4.2 h / 79 h / 28 h
+        - posts + comments: 5,413: 97 s / 47 min / 30 h /
+          12 h
+        - votes: dates are DAY-only -> no gaps from votes
+    - lemmy adhd: mean ~53 min (33k events, 3.3 y)
+    - github yt-dlp: mean ~28 min (94k events, ~5 y)
+    - wiki Abortion: mean ~16 h (21k events, 25 y)
+    - [ ] medians for lemmy/github/wiki: refetch (`data/`
+      not on disk; lemmy live API ~30 min)
+- forks depend on a ratio: spread time vs gap to the next
+  action, not on K itself
+- proposal: a sync RULE a reader accepts, per app class
+    - only two quantities:
+        - T.action: time between two consecutive actions
+          (from the corpus)
+        - T.sync: each peer syncs with an up-link every
+          T.sync (the app rule)
+    - chat: T.sync = 5-10 s; forum / usenet: ~30 min
+    - syncs per peer per action = T.action / T.sync
+    - syncs per action = 59 x T.action / T.sync
+    - waves per action = 59 x T.action / T.sync / 6 lanes
+    - e.g. chat: 13 s / 5 s = 2.6 syncs per peer, ~26 waves;
+      usenet: 43 min / 30 min = 1.4 syncs per peer, ~14
+    - fork share = the RESULT at that rule; also sweep T.sync
+      and plot forks vs T.sync / T.action (curves collapse?)
+- current waves model: OK, with two changes
+    - quota: each peer syncs T.action / T.sync times per
+      action, random order (back-to-back waves allowed)
+    - blind pick: at its turn, a peer pulls a random up-link;
+      a no-op pull still counts as its sync, but is not run
+    - today: picks only pulls with news; no per-peer quota
+- percentiles: p10 = 10% of gaps are at most that value;
+  p90 = 10% of gaps are at least that value
+- [x] implemented (26/10/06): `G.T = {action, sync}` in
+  `config.lua` (replaces GAP, D); `syncs()` builds the blind
+  quota, `play()` packs it in waves, in order
+    - a task waits if an earlier waiting task touches its
+      peers; a no-op sync counts (`noop`) but takes no lane
+    - the post's upload to its own mid stays (outside quota)
+    - drain: syncs of one T.action, repeated (`RMAX` = 20)
+- mock sweep (200 actions, seeds 1-3), forks by
+  T.action / T.sync:
+    - 1: 99%, 2: 95%, 5: 66%, 10: 21%, 20: 0.2%, 30+: 0%
+    - waves per action saturate at ~17 (no-ops are free)
+    - blind pull from a random neighbour is slow: ~20 syncs
+      per peer per action needed for no forks
+    - chat 13 s / 5 s = 2.6 -> ~90% forks; usenet 43 / 30 min
+      = 1.4 -> ~97%: "reasonable" polling forks almost always
+    - the previous oracle (sync only with news) ~ push /
+      event-driven designs; blind = polling: two real designs
+- real run, ratio 2 (`p2p/logs/tsync-1.log`): sync time
+  explodes with forks (act 14: ff avg 7 s, mg max 28 s;
+  oracle run: ~0.3 s) -> freechains cost with many forks
+- open: T.sync per app class; cite real systems (IRC/Matrix,
+  ActivityPub push, NNTP feeds, UUCP batches)
+
 # Partitions (scheduled)
 
 - cut 2-3 mids from their supers: each mid + its
@@ -291,6 +372,22 @@
                 - repro 8 of 8 attempts agree
                 - freechains `make tests`: all pass (user)
     - [x] fixed-width ff/mg fields (26/10/06)
+    - [x] fork metric: `miss` = earlier actions the author
+      lacks when posting (> 0: fork); forks every 10 and at
+      END, plus merge commits in the final DAG
+        - schedule-only (holders), so mock = real: K = 10,
+          20 actions, SEED 1 -> 5 forks (25%)
+        - [x] calibrate K (mock, 200 actions, seeds 1-3):
+            - K=6 97%, 8 83%, 9 60%, 10 16%, 11 4%, 12+ 0%
+            - threshold: 6K lane slots vs 58 pulls per action;
+              K < 10 backlog grows, K >= 12 always converges
+            - K = 10 (16%): NOT comparable to tpd-21 (no
+              time there, no sync rule here yet)
+        - [x] real run, K = 10, 20 actions: 5 forks (25%) =
+          mock; 5 merges in DAG; PASS
+          (`p2p/logs/waves-fork.log`)
+        - corpus: K varies with the gap -> bursts fork, quiet
+          spells do not; calibrate D on the 5k slice
             - reconfirmed on fresh `main` install (26/10/06):
               p2p 3 of 58 differ (`p2p/logs/waves-main.log`);
               repro 4 of 6 attempts diverge
@@ -336,8 +433,9 @@
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
-    - `. N Ts  <leaf>-><mid>  [W]  post=  pulls=  ff[n]=  mg[n]=
-      idle=`
+    - `. N Ts  <leaf>-><mid>  [W]  miss=  post=  pulls=  ff[n]=
+      mg[n]=  idle=`
+        - miss: earlier actions the author lacks (> 0: fork)
         - T: wall secs of this action
         - W: waves run for this action (< K: early stop)
         - post: post time (s)
@@ -346,8 +444,10 @@
           min/avg/max secs; none: `-.--/-.--/-.--`
         - counts padded: 2 digits (action), 4 (totals)
         - idle: lane slots left empty (no useful pull)
-    - `== N Ts  post=min/avg/max  pulls=  ff[n]=  mg[n]=
-      idle=`: totals every 10 actions
+    - `== N Ts  forks=n (p%)  post=min/avg/max  pulls=  ff[n]=
+      mg[n]=  idle=`: totals every 10 actions, blank lines
+      around
+    - `== END forks=n of N actions (p%)  merges in DAG=m`
     - `== END drain waves=W`: waves after the last action
         - not converged after RMAX waves: abort
     - `== END ...`: waves median/max, pulls, waves, wave wall
@@ -364,10 +464,7 @@
 
 # Next steps
 
-- 1. fork metric in `p2p.lua`: per action, does the author
-  hold every earlier action (no fork)? plus branches in
-  `list dag` at the end
-    - cheap now: the author lacks an active action -> fork
+- 1. [x] fork metric (`miss`, forks, merges in DAG)
 - 2. MODE=corpus in `p2p.lua`
     - input: a `lemmy-events.py` TSV (`SRC=`, as
       `lemmy-simple.lua`)

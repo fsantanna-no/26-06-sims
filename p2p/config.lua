@@ -6,9 +6,11 @@ local MODE = 'simple'       -- simple | corpus (not yet)
 return {
     MODE  = MODE,
     N_ACT = 20,             -- simple: number of actions
-    GAP   = 3600,           -- simple: chain secs between actions
-    D     = 360,            -- chain secs per wave (K = GAP/D = 10)
-    RMAX  = 100,            -- max waves of the final drain
+    T = {
+        action = 3600,      -- simple: chain secs between actions
+        sync   = 1800,      -- each peer syncs every T.sync secs
+    },
+    RMAX  = 20,             -- max T.action periods of the drain
     LANES = 6,              -- tasks per wave, all in parallel
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 108 links and exit

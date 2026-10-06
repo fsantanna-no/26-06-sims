@@ -6,17 +6,17 @@
 -- Mi carries i leaves, 45 leaves in all.
 -- Edge leaves also link to the neighbouring mid.
 -- Sibling links in fans of 4+ leaves.
--- Work runs in waves of LANES tasks, all in parallel.
+-- Sync rule: each peer syncs every T.sync with a random neighbour
+-- (a pull), so T.action / T.sync syncs per peer per action.
 -- Per action:
---  - wave 1: the leaf posts, + LANES-1 useful pulls
---  - wave 2: its own mid pulls the post, + LANES-1 useful pulls
---  - waves 3..K: LANES useful pulls, K = GAP/D
---  - stop early when every peer holds every action
--- After the last action, a drain runs waves until every peer
--- holds every action (or RMAX waves).
--- A useful pull: along a link, the source holds an action the
--- receiver lacks (tracked here, no git checks).
+--  - the leaf posts, and its own mid pulls the post (upload)
+--  - then the syncs of all peers, in random order (blind)
+-- A sync with nothing new counts, but is not run.
+-- Work runs in waves of LANES tasks, all in parallel.
 -- In a wave, writers are distinct, and no writer is a source.
+-- Holders per action are tracked here (no git checks).
+-- After the last action, a drain repeats the syncs of one
+-- T.action until every peer holds every action (or RMAX times).
 -- MODE=simple: artificial inline posts (the only mode so far).
 -- SINGLE RUN: G.BASE is wiped on start.
 -- Settings: edit config.lua (table G, no env).
@@ -225,13 +225,6 @@ end
 
 local HOLD, CNT, ACTIVE = {}, {}, {}
 
--- directed links: { to, from } in both directions
-local DL = {}
-for _, e in ipairs(EDGES) do
-    DL[#DL+1] = { e[1], e[2] }
-    DL[#DL+1] = { e[2], e[1] }
-end
-
 --[[
 -- Is a pull useful: the source holds an action the receiver lacks?
 -- Inputs:
@@ -239,7 +232,7 @@ end
 -- Outputs:
 --  - [boolean]
 -- Callers:
---  - pick [p2p.lua]
+--  - play [p2p.lua]
 --]]
 local function useful (to, from)
     for a in pairs(ACTIVE) do
@@ -250,50 +243,14 @@ local function useful (to, from)
     return false
 end
 
---[[
--- Fill free lanes with random useful pulls.
--- Writers are distinct, and no writer is also a source.
--- Inputs:
---  - tasks [table]: forced tasks (post, mid pull), extended in place
---  - ts    [integer]: virtual time of the wave
--- Outputs:
---  - none
--- Callers:
---  - wave [p2p.lua]
---]]
-local function pick (tasks, ts)
-    local W, R = {}, {}
-    for _, t in ipairs(tasks) do
-        W[t[2]] = true
-        if t[1] == 'pull' then R[t[3]] = true end
-    end
-    local ls = {}
-    for i, d in ipairs(DL) do ls[i] = d end
-    for i = #ls, 2, -1 do
-        local j = math.random(i)
-        ls[i], ls[j] = ls[j], ls[i]
-    end
-    for _, d in ipairs(ls) do
-        if #tasks >= G.LANES then
-            break
-        end
-        local to, from = d[1], d[2]
-        if not W[to] and not R[to] and not W[from] and useful(to, from) then
-            W[to], R[from] = true, true
-            tasks[#tasks+1] = { 'pull', to, from, ts }
-        end
-    end
-end
-
-local STATS = { pulls=0, idle=0, waves=0, wall=0 }
+local STATS = { pulls=0, idle=0, waves=0, wall=0, forks=0, noop=0 }
 local POST, FF, MG = {}, {}, {}     -- times (s), in order
 
 --[[
--- Run one wave: forced tasks plus random useful pulls, one per
--- lane, in parallel.
+-- Run one wave: the tasks, one per lane, in parallel.
 -- Then updates the holders.
 -- Inputs:
---  - tasks [table]: forced tasks (may be empty)
+--  - tasks [table]: at most LANES tasks
 --  - ts    [integer]: virtual time of the wave
 --  - act   [integer]: id of a posted action (nil if no post)
 -- Outputs:
@@ -303,10 +260,9 @@ local POST, FF, MG = {}, {}, {}     -- times (s), in order
 --  - "wave : pull <to> <- <from> : rc=<rc> <err>": a pull failed
 --  - "wave : post <leaf> : rc=<rc> <out>": a post failed
 -- Callers:
---  - main chunk [p2p.lua]: actions and drain
+--  - play [p2p.lua]
 --]]
 local function wave (tasks, ts, act)
-    pick(tasks, ts)
     -- gains from the holders at wave start (sources are not written)
     local gain = {}
     for i, t in ipairs(tasks) do
@@ -431,8 +387,111 @@ end
 
 assert(G.MODE == 'simple', "mode " .. G.MODE .. " : not yet")
 
-local K = G.GAP // G.D       -- waves per action
-assert(K >= 2, "config : GAP < 2*D")
+local Q = G.T.action / G.T.sync     -- syncs per peer per action
+
+--[[
+-- The syncs of one T.action: each peer, Q times, a random
+-- neighbour; random order.
+-- A fractional Q gives one more sync with that probability.
+-- Inputs:
+--  - none
+-- Outputs:
+--  - [table]: { {'pull', to, from}, ... }
+-- Callers:
+--  - main chunk [p2p.lua]: actions and drain
+--]]
+local function syncs ()
+    local seq = {}
+    local q, f = math.floor(Q), Q - math.floor(Q)
+    for p = 0, N-1 do
+        local n = q + ((math.random() < f) and 1 or 0)
+        for _ = 1, n do
+            seq[#seq+1] = { 'pull', p, ADJ[p][math.random(#ADJ[p])] }
+        end
+    end
+    for i = #seq, 2, -1 do
+        local j = math.random(i)
+        seq[i], seq[j] = seq[j], seq[i]
+    end
+    return seq
+end
+
+--[[
+-- Play a sequence of tasks in waves, in order.
+-- A task waits when its writer or source is busy in the wave,
+-- or touched by an earlier waiting task (keeps the order).
+-- A wave stops scanning when its lanes are full.
+-- A pull with nothing new counts (noop), but takes no lane.
+-- Chain time spreads the tasks over [ts, ts+span).
+-- Inputs:
+--  - seq  [table]: tasks, in order (post first, if any)
+--  - ts   [integer]: chain time of the first task
+--  - span [integer]: chain time of the whole sequence
+--  - act  [integer]: id of the posted action (nil if no post)
+-- Outputs:
+--  - [integer]: waves run
+-- Callers:
+--  - main chunk [p2p.lua]: actions and drain
+--]]
+local function play (seq, ts, span, act)
+    local n, done, waves = #seq, 0, 0
+    local pend = seq
+    while #pend > 0 do
+        -- W/R: writers/sources in this wave
+        -- WD/RD: of earlier tasks still waiting (keep the order)
+        local W, R, WD, RD, tasks, rest = {}, {}, {}, {}, {}, {}
+        local tw = ts + (span * done) // math.max(n, 1)
+        for i, t in ipairs(pend) do
+            local to, from = t[2], t[3]
+            if #tasks >= G.LANES then
+                table.move(pend, i, #pend, #rest + 1, rest)
+                break
+            end
+            local busy = W[to] or R[to] or WD[to] or RD[to]
+            if t[1] == 'pull' then
+                busy = busy or W[from] or WD[from]
+            end
+            if busy then
+                rest[#rest+1] = t
+                WD[to] = true
+                if t[1] == 'pull' then RD[from] = true end
+            elseif t[1] == 'post' then
+                W[to] = true
+                tasks[#tasks+1] = t
+            elseif not useful(to, from) then
+                STATS.noop = STATS.noop + 1
+                done = done + 1
+            else
+                W[to], R[from] = true, true
+                tasks[#tasks+1] = { 'pull', to, from, tw }
+            end
+        end
+        if #tasks > 0 then
+            wave(tasks, tw, act)
+            waves = waves + 1
+            done = done + #tasks
+        end
+        pend = rest
+    end
+    return waves
+end
+
+--[[
+-- How many earlier actions a peer lacks (> 0: its post forks).
+-- Inputs:
+--  - p [integer]: peer id
+-- Outputs:
+--  - [integer]: active actions not held by `p`
+-- Callers:
+--  - main chunk [p2p.lua]: before each post
+--]]
+local function lacks (p)
+    local n = 0
+    for a in pairs(ACTIVE) do
+        if not HOLD[a][p] then n = n + 1 end
+    end
+    return n
+end
 
 --[[
 -- Is any action still missing somewhere?
@@ -450,47 +509,51 @@ end
 local R, AUTH = {}, {}
 local t0 = now()
 for a = 1, G.N_ACT do
-    local ts = G.T0 + a*G.GAP
+    local ts = G.T0 + a*G.T.action
     local l  = LEAF[math.random(#LEAF)]
     local m  = MID[HOME[l]+1]
     AUTH[l]  = true
-    local ta, pa, ia = now(), STATS.pulls, STATS.idle
+    local ta, pa, ia, na = now(), STATS.pulls, STATS.idle, STATS.noop
     local jf, jm = #FF + 1, #MG + 1
-    -- wave 1: the leaf posts
-    wave({ { 'post', l, ts, KEYS .. "/" .. NAME[l],
-        'simple ' .. a .. ' by ' .. NAME[l] } }, ts, a)
-    -- wave 2: its own mid pulls the post
-    wave({ { 'pull', m, l, ts + G.D } }, ts + G.D)
-    -- waves 3..K, early stop
-    local w = 2
-    while w < K and pending() do
-        wave({}, ts + w*G.D)
-        w = w + 1
-    end
+    -- fork: the author lacks earlier actions
+    local miss = lacks(l)
+    if miss > 0 then STATS.forks = STATS.forks + 1 end
+    -- the post, its upload to the own mid, then the syncs
+    local seq = syncs()
+    table.insert(seq, 1, { 'post', l, ts, KEYS .. "/" .. NAME[l],
+        'simple ' .. a .. ' by ' .. NAME[l] })
+    table.insert(seq, 2, { 'pull', m, l })
+    local w = play(seq, ts, G.T.action, a)
     R[#R+1] = w
     local nf, sf = mma(FF, jf)
     local nm, sm = mma(MG, jm)
-    print(string.format(". %5d %3ds  %s->%s  [%02d]  post=%.2f  pulls=%02d  ff[%02d]=%s  mg[%02d]=%s  idle=%d",
-        a, math.floor(now() - ta), NAME[l], NAME[m], w, POST[#POST],
-        STATS.pulls - pa, nf, sf, nm, sm, STATS.idle - ia))
+    print(string.format(". %5d %3ds  %s->%s  [%03d]  miss=%d  post=%.2f  pulls=%02d  noop=%03d  ff[%02d]=%s  mg[%02d]=%s  idle=%d",
+        a, math.floor(now() - ta), NAME[l], NAME[m], w, miss, POST[#POST],
+        STATS.pulls - pa, STATS.noop - na, nf, sf, nm, sm, STATS.idle - ia))
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)
         local nm, sm = mma(MG, 1)
-        print(string.format("== %d %4ds  post=%s  pulls=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
-            a, math.floor(now() - t0), sp, STATS.pulls, nf, sf, nm, sm,
-            STATS.idle))
+        print()
+        print(string.format("== %d %4ds  forks=%d (%d%%)  post=%s  pulls=%d  noop=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
+            a, math.floor(now() - t0), STATS.forks, 100*STATS.forks//a,
+            sp, STATS.pulls, STATS.noop, nf, sf, nm, sm, STATS.idle))
+        print()
     end
 end
 
--- final drain: waves until every peer holds every action
-local dw = 0
+-- final drain: the syncs of one T.action, until every peer
+-- holds every action
+local dw, dp = 0, 0
 while pending() do
-    assert(dw < G.RMAX, "drain : not converged after " .. dw .. " waves")
-    wave({}, G.T0 + (G.N_ACT+1)*G.GAP + dw*G.D)
-    dw = dw + 1
+    assert(dp < G.RMAX, "drain : not converged after " .. dp .. " periods")
+    dw = dw + play(syncs(), G.T0 + (G.N_ACT+1+dp)*G.T.action, G.T.action)
+    dp = dp + 1
 end
-print(string.format("== END drain waves=%d", dw))
+print(string.format("== END drain periods=%d waves=%d", dp, dw))
+local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
+print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
+    STATS.forks, G.N_ACT, 100*STATS.forks//G.N_ACT, merges))
 
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer
