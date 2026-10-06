@@ -259,9 +259,24 @@
           copy): FAIL too, 3 peers differ -> NOT a race
             - same pulls (1,158), same merges (11), drain 2
             - 290 s vs 61 s in parallel (4.8x from lanes)
-        - cause: freechains (tree-trash) cached order depends
-          on the sync path; a fresh clone recomputes another
-          -> upstream bug, for the freechains repo (not here)
+        - cause: freechains cached order depends on the sync
+          path; a fresh clone recomputes another -> upstream
+          bug, for the freechains repo (not here)
+            - installed build: `state.lua` 89 lines = MAIN, not
+              tree-trash (files dated 26/09/04)
+            - merge bcec265 = 10ce90f + 7d6c85b (concurrent)
+            - p12 snapshot of 7d6c85b: own lineage (ok)
+            - p00 snapshot of 7d6c85b: includes 10ce90f and its
+              author's -500 reps = the merge's state
+            - `action.lua:373`: snapshot written once ("NEVER
+              overwrite"), assumes the first write is the own
+              lineage; false when the commit is first applied
+              as a loser replayed on the winner's state
+              (`CONSENSUS.replay` from `sync.lua`)
+            - later forks read the bad snapshot as fork base
+              -> other reps -> other winner -> other order
+            - fix idea: no snapshots during loser replay, or
+              snapshot from the commit's own parents
         - old loop PASSed (k = 10): likely luck, same risk
         - user rerun: identical (same 4 peers): fixed repro
           for the upstream fix
