@@ -7,8 +7,8 @@ return {
     MODE  = MODE,
     N_ACT = 20,             -- simple: number of actions
     GAP   = 3600,           -- simple: chain secs between actions
-    D     = 60,             -- chain secs per round
-    RMAX  = 40,             -- max rounds per action
+    D     = 360,            -- chain secs per round (k = GAP/D = 10)
+    RMAX  = 40,             -- max rounds of the final drain
     LANES = 6,              -- parallel lanes per step
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 108 links and exit

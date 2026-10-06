@@ -11,7 +11,9 @@
 --  2. leaves pull from their mid(s) + random super pairs +
 --     random sibling pairs
 --  3. random mid/super pairs (matching on M-S and S-S links)
---  repeat 2-3 until every HEAD agrees (or RMAX rounds)
+--  repeat 2-3 k = GAP/D times (early stop on equal HEADs)
+-- After the last action, a drain repeats 2-3 until every HEAD
+-- agrees (or RMAX rounds).
 -- Each step runs in LANES parallel lanes.
 -- One job per written peer, so one writer per peer.
 -- Sources are only read, by `git fetch`.
@@ -364,17 +366,19 @@ local function step3 (ts)
 end
 
 --[[
--- Rounds of steps 2-3 until all HEADs agree, or RMAX rounds.
+-- Rounds of steps 2-3, at most n.
+-- Stops early when all HEADs agree.
 -- Inputs:
 --  - ts [integer]: virtual time of the first round
+--  - n  [integer]: max rounds
 -- Outputs:
 --  - [integer]: rounds run
 --  - [boolean]: converged
 -- Callers:
---  - main chunk [p2p.lua]
+--  - main chunk [p2p.lua]: k per action, RMAX for the drain
 --]]
-local function rounds (ts)
-    for r = 1, G.RMAX do
+local function rounds (ts, n)
+    for r = 1, n do
         local t = ts + r*G.D
         step2(t)
         step3(t)
@@ -382,7 +386,7 @@ local function rounds (ts)
             return r, true
         end
     end
-    return G.RMAX, false
+    return n, false
 end
 
 -------------------------------------------------------------------------------
@@ -428,6 +432,8 @@ end
 
 assert(G.MODE == 'simple', "mode " .. G.MODE .. " : not yet")
 
+local K = G.GAP // G.D       -- rounds per action
+assert(K >= 1, "config : GAP < D")
 local R = {}
 local AUTH = {}
 local t0 = now()
@@ -442,10 +448,9 @@ for a = 1, G.N_ACT do
         " inline 'simple " .. a .. " by " .. NAME[l] .. "'")
     assert(h:match('^%x+$'), NAME[l] .. ' : post : ' .. h)
     run({ { pull(MID[HOME[l]+1], l, ts) } }, '1')
-    -- 2-3 until converged
-    local r, ok = rounds(ts)
+    -- 2-3, k rounds (no convergence required)
+    local r = rounds(ts, K)
     R[#R+1] = r
-    assert(ok, "act " .. a .. " : not converged after " .. r .. " rounds")
     print(string.format(". %5d  %s->%s  rounds=%02d  pulls=%02d  skips=%04d  %ds",
         a, NAME[l], NAME[MID[HOME[l]+1]], r, STATS.pulls - pa,
         STATS.skips - sa, math.floor(now() - ta)))
@@ -454,6 +459,11 @@ for a = 1, G.N_ACT do
             a, STATS.pulls, STATS.skips, math.floor(now() - t0)))
     end
 end
+
+-- final drain: rounds until all HEADs agree
+local dr, dok = rounds(G.T0 + (G.N_ACT+1)*G.GAP, G.RMAX)
+assert(dok, "drain : not converged after " .. dr .. " rounds")
+print(string.format("== END drain rounds=%d", dr))
 
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer

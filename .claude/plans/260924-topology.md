@@ -216,6 +216,12 @@
     - [x] skips and secs per action, totals every 10 actions;
       `N_ACT` 20
     - [ ] simple test, 20 actions (run by the user)
+    - [x] k rounds per action, no convergence per action
+        - k = GAP/D = 10 (`D` 360): simulated forks 27% at
+          k=8, 7% at k=12 -> ~15% (target 10-20%)
+        - early stop on equal HEADs
+        - final drain until HEADs agree (cap `RMAX`)
+    - [ ] simple test with k = 10 (run by the user)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -247,17 +253,19 @@
     - ~4 min for 20 actions; ends with `== PASS` or `== FAIL`
 - knobs: edit `p2p/config.lua` (table `G`, no env), one
   comment per field
-    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (60), `RMAX` (40),
+    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (360), `RMAX` (40),
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
     - `. N  <leaf>-><mid>  rounds=R  pulls=P  skips=S  Ts`
-        - rounds: until all 59 HEADs agree (simple mode)
-        - pulls: real syncs for this action (58 expected)
+        - rounds: run for this action (< k: early stop)
+        - pulls: real syncs for this action
         - skips: pulls skipped by the HEAD check, this action
         - T: wall secs of this action
     - `== N  pulls=  skips=  Ts`: totals every 10 actions
-        - not converged after RMAX rounds: abort
+    - `== END drain rounds=R`: rounds after the last action
+      until all HEADs agree
+        - drain not converged after RMAX rounds: abort
     - `== END ...`: rounds median/max, total pulls, steps,
       times; peers whose `list order` differs; `reps`
       mismatches
