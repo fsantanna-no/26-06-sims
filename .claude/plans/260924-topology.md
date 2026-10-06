@@ -73,7 +73,7 @@
 - `p2p/p2p.lua` reusing each corpus event stream; single-peer
   drivers untouched
 
-# Sync policy (26/10/06, open)
+# Sync policy (26/10/06, superseded by push below)
 
 - concern: a target fork share (15-20%, 0%) is arbitrary;
   the fork share is an OUTCOME of how often peers sync
@@ -153,6 +153,47 @@
   oracle run: ~0.3 s) -> freechains cost with many forks
 - open: T.sync per app class; cite real systems (IRC/Matrix,
   ActivityPub push, NNTP feeds, UUCP batches)
+
+
+# Sync rule: push with relay delay (26/10/06, decided)
+
+- push: a peer that gets something new arms a timer U(0, N)
+  chain secs; when it fires, every neighbour lacking something
+  pulls from it
+    - keep: a pending timer is not restarted (it carries what
+      arrived meanwhile); restart starves under bursts (const
+      3600 s gaps, N = 3600: 86% vs 71% forks)
+- realistic: ActivityPub delivers on change (send queues);
+  Bitcoin relays after random Poisson delays (trickling);
+  Gnutella flooded at once; N is the one relaxation for forks
+- confirmed blind model (re-implemented, 26/10/06): constant
+  ratio 1: 99.5%, 2: 97.5%, 5: 70%, 10: 20%, 11: 16%,
+  12: 11%, 20: 0% -> 15% at ~11.2
+- real gaps (this machine, p10 / median / p90 / mean):
+    - chat 166,277: 2 s / 13 s / 99 s / 7 min
+    - adhd 33,027: 44 s / 9 min / 84 min / 53 min
+    - github 94,006: 45 s / 10 min / 83 min / 32 min
+    - wiki 13,973: 49 s / 18 min / 29 h / 15.6 h
+    - usenet 25,066: 20 s / 42 min / 21.7 h / 9.0 h
+    - se-veg 5,565 (posts + comments): 83 s / 43 min /
+      28.7 h / 11.3 h
+- blind polling on real gaps (2,000-gap middle slices):
+    - forks at T.sync 30 min: adhd 97%, github 98%, wiki 81%,
+      usenet 90%, se-veg 63%; chat at 5 / 10 s: 79 / 89%
+    - 15% needs T.sync: chat 0.4 s, adhd 13 s, github 16 s,
+      wiki 6 s, usenet 3 s, se-veg 47 s: unrealistic
+      (short gaps dominate; one random neighbour per sync)
+- push, N for 15% forks (U(1, N), keep; same slices):
+    - adhd 52 s, github 65 s, wiki 20 s, usenet 11 s,
+      se-veg 3.2 min; spread to all 59 in 0.5-7 min
+    - chat: even N = 1 gives 23%; chat stays INSTANTANEOUS
+      (N = 0): forks only at same-second messages (~3%)
+- the paper: chat instantaneous (natural ~3%); the others
+  at N tuned to 15%, a chosen stress level for async apps
+- [x] `p2p.lua`: push with timers (heap, keep), `G.T.relay`
+  replaces `G.T.sync`; drain = the pending timers
+- [ ] per-tier N (supers fast, leaves slow): only if asked
+- [ ] recalibrate N with U(0, N) (calibrated with U(1, N))
 
 # Partitions (scheduled)
 
@@ -419,25 +460,28 @@
 
 # How to run
 
-- build: freechains 260914-tree-trash installed
-    - `--version` says v0.21.0 for both builds: check
-      `/usr/local/share/lua/5.4/freechains/chain/state.lua`
-      has ~1181 lines (main: 89)
+- build: freechains `261006-bug-winner` (75e6800) installed
+  26/10/06 19:30 (`main` layout: `state.lua` 89 lines)
+    - `--version` says v0.21.0 for every build: check the
+      installed `state.lua` (tree-trash: ~1181 lines)
+    - lemmy single-peer runs used tree-trash: timings not
+      comparable
 - ONE run at a time (CPU-bound; timings)
 - simple test (artificial posts):
     - `cd p2p && lua5.4 p2p.lua > logs/simple-N.log 2>&1`
     - ~4 min for 20 actions; ends with `== PASS` or `== FAIL`
 - knobs: edit `p2p/config.lua` (table `G`, no env), one
   comment per field
-    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (360), `RMAX` (100),
-      `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
+    - `MODE`, `N_ACT` (20), `T.action` (3600), `T.relay`
+      (1800), `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`,
+      `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
     - `. N Ts  <leaf>-><mid>  [W]  miss=  post=  pulls=  ff[n]=
       mg[n]=  idle=`
         - miss: earlier actions the author lacks (> 0: fork)
         - T: wall secs of this action
-        - W: waves run for this action (< K: early stop)
+        - W: waves of pushes due before this action
         - post: post time (s)
         - pulls: syncs run in this action's waves
         - ff/mg: fast-forward / merge syncs, count and
@@ -448,8 +492,8 @@
       mg[n]=  idle=`: totals every 10 actions, blank lines
       around
     - `== END forks=n of N actions (p%)  merges in DAG=m`
-    - `== END drain waves=W`: waves after the last action
-        - not converged after RMAX waves: abort
+    - `== END drain waves=W`: waves of the pending timers
+      after the last action; actions not everywhere: abort
     - `== END ...`: waves median/max, pulls, waves, wave wall
       time, idle; peers whose `list order` differs; `reps`
       mismatches; PASS also needs N_ACT posts in the order
@@ -476,19 +520,18 @@
     - [ ] same repro on `main` vs `261006-bug-winner`: did
       the fix add the cost (state reads per inner fork)?
     - [ ] if confirmed: plan in the freechains repo
-- 3. [ ] sync rule, decisions
-    - [ ] T.sync per app class, with sources a reader
-      accepts (IRC/Matrix, ActivityPub push, NNTP feeds,
-      UUCP batches)
-    - [ ] two designs: polling (blind, now) and push
-      (sync on news, the old oracle); restore push as a
-      `config.lua` option and report both
-- 4. [ ] corpus gaps: refetch lemmy, github, wiki data;
-  medians and percentiles into Sync policy
+- 3. [x] sync rule: push with relay delay N (see Sync rule)
+    - [x] `p2p.lua` rewritten: timers in chain time, keep
+    - [ ] simple test with push (`T.relay` 1800: ~25% forks,
+      exercises merges)
+    - [ ] polling (blind) only as a contrast, if asked
+- 4. [x] corpus gaps: all six measured on this machine (see
+  Sync rule)
 - 5. [ ] MODE=corpus in `p2p.lua`
     - input: a `lemmy-events.py` TSV (`SRC`, as
       `lemmy-simple.lua`)
-    - T.action per action = real gap to the next event
+    - T.action per action = real gap to the next event;
+      `T.relay` = N per corpus (chat 0)
     - authors placed uniformly on the 45 leaves (sticky,
       `SEED`); moderators too
     - kinds as `lemmy-simple.lua`: post, remove (revoke
@@ -498,13 +541,13 @@
     - sweep every WINDOW actions on every peer (in waves)
 - 6. [ ] smoke: `adhd` first 500 events, mock first (forks),
   then real
-- 7. [ ] 5k slice: forks at the chosen T.sync, plus a T.sync
+- 7. [ ] 5k slice: forks at N (expect ~15%), plus an N
   sweep (mock)
 - 8. [ ] full `adhd` (time depends on step 2)
 - 9. [ ] partitions: cut M01, M05, M09 for 1 day, then 8
   days; hard forks counted, not aborted
-- 10. [ ] results: `p2p/RESULTS.md` (fork curve by
-  T.action / T.sync, per corpus; push vs polling)
+- 10. [ ] results: `p2p/RESULTS.md` (forks by N per corpus;
+  chat instantaneous)
 
 # Won't do
 

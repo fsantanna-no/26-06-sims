@@ -8,9 +8,12 @@ return {
     N_ACT = 20,             -- simple: number of actions
     T = {
         action = 3600,      -- simple: chain secs between actions
-        sync   = 1800,      -- each peer syncs every T.sync secs
+        relay  = 1800,      -- push delay U(0, relay) secs per hop
     },
-    RMAX  = 20,             -- max T.action periods of the drain
+    -- relay for ~15% forks on real gaps (2,000-gap slices, 26/10/06):
+    -- adhd 52, github 65, wiki 20, usenet 11, se-veg 192; chat 0
+    -- (instantaneous, ~3% forks: same-second messages only)
+    -- simple: 1800 over a 3600 gap forks ~25% (exercises merges)
     LANES = 6,              -- tasks per wave, all in parallel
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 108 links and exit

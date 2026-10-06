@@ -6,17 +6,16 @@
 -- Mi carries i leaves, 45 leaves in all.
 -- Edge leaves also link to the neighbouring mid.
 -- Sibling links in fans of 4+ leaves.
--- Sync rule: each peer syncs every T.sync with a random neighbour
--- (a pull), so T.action / T.sync syncs per peer per action.
--- Per action:
---  - the leaf posts, and its own mid pulls the post (upload)
---  - then the syncs of all peers, in random order (blind)
--- A sync with nothing new counts, but is not run.
+-- Sync rule: push with a relay delay (26/10/06).
+-- A peer that gets something new arms a timer of U(0, T.relay)
+-- chain secs (keep: a pending timer is not restarted).
+-- When it fires, every neighbour lacking something pulls from it.
+-- T.relay = 0: instantaneous (chat).
+-- Fork: the author lacks an earlier action when it posts.
 -- Work runs in waves of LANES tasks, all in parallel.
 -- In a wave, writers are distinct, and no writer is a source.
 -- Holders per action are tracked here (no git checks).
--- After the last action, a drain repeats the syncs of one
--- T.action until every peer holds every action (or RMAX times).
+-- After the last action, the pending timers drain.
 -- MODE=simple: artificial inline posts (the only mode so far).
 -- SINGLE RUN: G.BASE is wiped on start.
 -- Settings: edit config.lua (table G, no env).
@@ -387,91 +386,128 @@ end
 
 assert(G.MODE == 'simple', "mode " .. G.MODE .. " : not yet")
 
-local Q = G.T.action / G.T.sync     -- syncs per peer per action
+local HEAP, TIMER = {}, {}          -- pending fires; peer -> fire time
 
 --[[
--- The syncs of one T.action: each peer, Q times, a random
--- neighbour; random order.
--- A fractional Q gives one more sync with that probability.
+-- Push a fire onto the heap (min by time, then by insertion).
 -- Inputs:
---  - none
+--  - t [number]: chain time of the fire
+--  - p [integer]: peer
 -- Outputs:
---  - [table]: { {'pull', to, from}, ... }
+--  - none
 -- Callers:
---  - main chunk [p2p.lua]: actions and drain
+--  - arm [p2p.lua]
 --]]
-local function syncs ()
-    local seq = {}
-    local q, f = math.floor(Q), Q - math.floor(Q)
-    for p = 0, N-1 do
-        local n = q + ((math.random() < f) and 1 or 0)
-        for _ = 1, n do
-            seq[#seq+1] = { 'pull', p, ADJ[p][math.random(#ADJ[p])] }
-        end
+local SEQ = 0
+local function hpush (t, p)
+    SEQ = SEQ + 1
+    local e, i = { t, SEQ, p }, #HEAP + 1
+    HEAP[i] = e
+    while i > 1 do
+        local j = i // 2
+        local a, b = HEAP[j], HEAP[i]
+        if a[1] < b[1] or (a[1] == b[1] and a[2] < b[2]) then break end
+        HEAP[i], HEAP[j] = a, b
+        i = j
     end
-    for i = #seq, 2, -1 do
-        local j = math.random(i)
-        seq[i], seq[j] = seq[j], seq[i]
-    end
-    return seq
 end
 
 --[[
--- Play a sequence of tasks in waves, in order.
--- A task waits when its writer or source is busy in the wave,
--- or touched by an earlier waiting task (keeps the order).
--- A wave stops scanning when its lanes are full.
--- A pull with nothing new counts (noop), but takes no lane.
--- Chain time spreads the tasks over [ts, ts+span).
+-- Pop the earliest fire.
 -- Inputs:
---  - seq  [table]: tasks, in order (post first, if any)
---  - ts   [integer]: chain time of the first task
---  - span [integer]: chain time of the whole sequence
---  - act  [integer]: id of the posted action (nil if no post)
+--  - none
+-- Outputs:
+--  - [table]: { t, seq, p }
+-- Callers:
+--  - advance [p2p.lua]
+--]]
+local function hpop ()
+    local top, last = HEAP[1], table.remove(HEAP)
+    if #HEAP > 0 then
+        HEAP[1] = last
+        local i = 1
+        while true do
+            local l, r, m = 2*i, 2*i + 1, i
+            local lt = function (x, y)
+                return HEAP[x][1] < HEAP[y][1] or
+                    (HEAP[x][1] == HEAP[y][1] and HEAP[x][2] < HEAP[y][2])
+            end
+            if l <= #HEAP and lt(l, m) then m = l end
+            if r <= #HEAP and lt(r, m) then m = r end
+            if m == i then break end
+            HEAP[i], HEAP[m] = HEAP[m], HEAP[i]
+            i = m
+        end
+    end
+    return top
+end
+
+--[[
+-- Arm the relay timer of a peer that got something new.
+-- Keep: a pending timer is not restarted.
+-- Inputs:
+--  - p [integer]: peer
+--  - t [number]: chain time of the gain
+-- Outputs:
+--  - none
+-- Callers:
+--  - main chunk, fire [p2p.lua]
+--]]
+local function arm (p, t)
+    if TIMER[p] then
+        return
+    end
+    TIMER[p] = t + math.random() * G.T.relay
+    hpush(TIMER[p], p)
+end
+
+--[[
+-- Fire a peer's timer: every neighbour lacking something pulls
+-- from it, in waves of LANES (receivers distinct, source read).
+-- Each receiver gained, so it arms its own timer.
+-- Inputs:
+--  - p [integer]: peer
+--  - t [number]: chain time of the fire
 -- Outputs:
 --  - [integer]: waves run
 -- Callers:
---  - main chunk [p2p.lua]: actions and drain
+--  - advance [p2p.lua]
 --]]
-local function play (seq, ts, span, act)
-    local n, done, waves = #seq, 0, 0
-    local pend = seq
-    while #pend > 0 do
-        -- W/R: writers/sources in this wave
-        -- WD/RD: of earlier tasks still waiting (keep the order)
-        local W, R, WD, RD, tasks, rest = {}, {}, {}, {}, {}, {}
-        local tw = ts + (span * done) // math.max(n, 1)
-        for i, t in ipairs(pend) do
-            local to, from = t[2], t[3]
-            if #tasks >= G.LANES then
-                table.move(pend, i, #pend, #rest + 1, rest)
-                break
-            end
-            local busy = W[to] or R[to] or WD[to] or RD[to]
-            if t[1] == 'pull' then
-                busy = busy or W[from] or WD[from]
-            end
-            if busy then
-                rest[#rest+1] = t
-                WD[to] = true
-                if t[1] == 'pull' then RD[from] = true end
-            elseif t[1] == 'post' then
-                W[to] = true
-                tasks[#tasks+1] = t
-            elseif not useful(to, from) then
-                STATS.noop = STATS.noop + 1
-                done = done + 1
-            else
-                W[to], R[from] = true, true
-                tasks[#tasks+1] = { 'pull', to, from, tw }
-            end
+local function fire (p, t)
+    TIMER[p] = nil
+    local qs = {}
+    for _, q in ipairs(ADJ[p]) do
+        if useful(q, p) then qs[#qs+1] = q end
+    end
+    local waves = 0
+    for i = 1, #qs, G.LANES do
+        local tasks = {}
+        for j = i, math.min(i + G.LANES - 1, #qs) do
+            tasks[#tasks+1] = { 'pull', qs[j], p, math.floor(t) }
         end
-        if #tasks > 0 then
-            wave(tasks, tw, act)
-            waves = waves + 1
-            done = done + #tasks
+        wave(tasks, math.floor(t), nil)
+        waves = waves + 1
+    end
+    for _, q in ipairs(qs) do arm(q, t) end
+    return waves
+end
+
+--[[
+-- Run every fire due up to a chain time, in order.
+-- Inputs:
+--  - upto [number]: chain time (math.huge: drain)
+-- Outputs:
+--  - [integer]: waves run
+-- Callers:
+--  - main chunk [p2p.lua]
+--]]
+local function advance (upto)
+    local waves = 0
+    while #HEAP > 0 and HEAP[1][1] <= upto do
+        local e = hpop()
+        if TIMER[e[3]] == e[1] then
+            waves = waves + fire(e[3], e[1])
         end
-        pend = rest
     end
     return waves
 end
@@ -493,64 +529,44 @@ local function lacks (p)
     return n
 end
 
---[[
--- Is any action still missing somewhere?
--- Inputs:
---  - none
--- Outputs:
---  - [boolean]
--- Callers:
---  - main chunk [p2p.lua]
---]]
-local function pending ()
-    return next(ACTIVE) ~= nil
-end
-
 local R, AUTH = {}, {}
 local t0 = now()
 for a = 1, G.N_ACT do
     local ts = G.T0 + a*G.T.action
-    local l  = LEAF[math.random(#LEAF)]
-    local m  = MID[HOME[l]+1]
-    AUTH[l]  = true
-    local ta, pa, ia, na = now(), STATS.pulls, STATS.idle, STATS.noop
+    local ta, pa = now(), STATS.pulls
     local jf, jm = #FF + 1, #MG + 1
-    -- fork: the author lacks earlier actions
+    -- the pushes due before this action
+    local w = advance(ts)
+    -- the post: fork if the author lacks earlier actions
+    local l = LEAF[math.random(#LEAF)]
+    AUTH[l] = true
     local miss = lacks(l)
     if miss > 0 then STATS.forks = STATS.forks + 1 end
-    -- the post, its upload to the own mid, then the syncs
-    local seq = syncs()
-    table.insert(seq, 1, { 'post', l, ts, KEYS .. "/" .. NAME[l],
-        'simple ' .. a .. ' by ' .. NAME[l] })
-    table.insert(seq, 2, { 'pull', m, l })
-    local w = play(seq, ts, G.T.action, a)
+    wave({ { 'post', l, ts, KEYS .. "/" .. NAME[l],
+        'simple ' .. a .. ' by ' .. NAME[l] } }, ts, a)
+    arm(l, ts)
     R[#R+1] = w
     local nf, sf = mma(FF, jf)
     local nm, sm = mma(MG, jm)
-    print(string.format(". %5d %3ds  %s->%s  [%03d]  miss=%d  post=%.2f  pulls=%02d  noop=%03d  ff[%02d]=%s  mg[%02d]=%s  idle=%d",
-        a, math.floor(now() - ta), NAME[l], NAME[m], w, miss, POST[#POST],
-        STATS.pulls - pa, STATS.noop - na, nf, sf, nm, sm, STATS.idle - ia))
+    print(string.format(". %5d %3ds  %s  [%03d]  miss=%d  post=%.2f  pulls=%02d  ff[%02d]=%s  mg[%02d]=%s",
+        a, math.floor(now() - ta), NAME[l], w, miss, POST[#POST],
+        STATS.pulls - pa, nf, sf, nm, sm))
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)
         local nm, sm = mma(MG, 1)
         print()
-        print(string.format("== %d %4ds  forks=%d (%d%%)  post=%s  pulls=%d  noop=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
+        print(string.format("== %d %4ds  forks=%d (%d%%)  post=%s  pulls=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
             a, math.floor(now() - t0), STATS.forks, 100*STATS.forks//a,
-            sp, STATS.pulls, STATS.noop, nf, sf, nm, sm, STATS.idle))
+            sp, STATS.pulls, nf, sf, nm, sm, STATS.idle))
         print()
     end
 end
 
--- final drain: the syncs of one T.action, until every peer
--- holds every action
-local dw, dp = 0, 0
-while pending() do
-    assert(dp < G.RMAX, "drain : not converged after " .. dp .. " periods")
-    dw = dw + play(syncs(), G.T0 + (G.N_ACT+1+dp)*G.T.action, G.T.action)
-    dp = dp + 1
-end
-print(string.format("== END drain periods=%d waves=%d", dp, dw))
+-- final drain: the pending timers, until none is left
+local dw = advance(math.huge)
+assert(next(ACTIVE) == nil, "drain : actions not everywhere")
+print(string.format("== END drain waves=%d", dw))
 local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
 print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
     STATS.forks, G.N_ACT, 100*STATS.forks//G.N_ACT, merges))
@@ -579,7 +595,7 @@ for l in pairs(AUTH) do
     bad_r = bad_r + same("reps member " .. KEYS .. "/" .. NAME[l] .. ".pub")
 end
 table.sort(R)
-print(string.format("== END actions=%d  waves median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
+print(string.format("== END actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
     G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls,
     STATS.waves, STATS.wall, STATS.idle, now() - t0))
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
