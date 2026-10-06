@@ -215,13 +215,19 @@
       cur/tot secs; no setup line, `ok` or skips
     - [x] skips and secs per action, totals every 10 actions;
       `N_ACT` 20
-    - [ ] simple test, 20 actions (run by the user)
     - [x] k rounds per action, no convergence per action
         - k = GAP/D = 10 (`D` 360): simulated forks 27% at
           k=8, 7% at k=12 -> ~15% (target 10-20%)
         - early stop on equal HEADs
         - final drain until HEADs agree (cap `RMAX`)
-    - [ ] simple test with k = 10 (run by the user)
+    - [x] simple test with k = 10, 20 actions (26/10/06): PASS
+      in 128 s (~5 s per action)
+        - 10 of 20 actions hit k without converging (e.g. act
+          3: 12 pulls, act 4 catches up with 82)
+        - early stops at 7-9 rounds (simulated median 11)
+        - pulls 1,136 < 20 x 58: one pull can carry 2 actions
+        - drain 2 rounds, same order and reps on all 59
+        - forks not counted yet: needs the fork metric
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
