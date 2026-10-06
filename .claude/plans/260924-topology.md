@@ -228,6 +228,15 @@
         - pulls 1,136 < 20 x 58: one pull can carry 2 actions
         - drain 2 rounds, same order and reps on all 59
         - forks not counted yet: needs the fork metric
+        - rerun: identical actions, rounds, pulls (SEED
+          reproducible); real 130 s, user 127 s, sys 176 s
+          (~2.3 cores busy of 10)
+        - steps 94 s; outside steps 35 s (HEAD checks, posts,
+          END check)
+        - sys > user: process spawning (~19k skip checks)
+        - est. 5k slice ~7 h, full `adhd` ~2 days at 5 s/action
+    - [x] same test without the skip check (26/10/06): too
+      slow, reverted -> skip check stays
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
