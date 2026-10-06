@@ -40,34 +40,36 @@
 - placement: authors UNIFORM over the 45 leaves (sticky)
 - diagram: `p2p/hubs50.dia` (hubs-59; file name kept)
 
-# Loop (one action at a time)
+# Loop (waves of 6 lanes, 26/10/06)
 
-- 1. action: a leaf acts (`--now=ts`); its mid pulls from it
-- 2. leaves pull from their mid(s) (all at once, a dual-homed
-  leaf one mid after the other; not from a mid being written)
-  + random super pairs + random sibling pairs
-- 3. random mid/super pairs (matching on M-S and S-S links)
-- repeat 2-3 k times, then the next action
-    - k = (gap to the next action) / d, d = chain time of one
-      round (e.g. d = 5 min -> ~10 rounds per `adhd` gap)
-    - stop early once every peer has the same HEAD
-- within a step: parallel, ONE writer per peer, reads shared
-  (safe: a pull only `git fetch`es the source); steps in
-  sequence
-    - 6 lanes per step: `( job ; job ; ... ) &` x 6, then
-      `wait`; one job per receiving peer, its pulls joined by
-      `;` (not `&&`), one exit code per pull; jobs assigned
-      longest first to the least loaded lane
-    - after each round: all 59 HEADs (`git rev-parse`); all
-      equal -> converged, skip the rest of the gap
-- skip a pull when the receiver already has the source's HEAD
-  commit (`git cat-file -e`, ms)
-- simulated (no freechains, 1 action per loop):
+- wave = 6 tasks, one per lane, all in parallel, then `wait`
+- per action:
+    - wave 1: the leaf posts (`--now=ts`) + 5 useful pulls
+    - wave 2: its own mid pulls the post + 5 useful pulls
+    - waves 3..K: 6 useful pulls
+    - K = GAP / D (D = chain secs per wave); K = 10 now
+    - stop early once every peer holds every action
+- drain after the last action: waves until every peer holds
+  every action (cap `RMAX` waves)
+- useful pull: along a link, the source holds an action the
+  receiver lacks
+    - tracked in Lua: holders per action not yet everywhere;
+      a pull copies all the source's actions; retired at 59
+    - no skip checks, no HEAD checks (replaced, 26/10/06)
+    - models peers syncing when they have news, not blind
+      gossip: fewer forks per K than the old loop
+- in a wave: writers distinct, no writer is a source (one
+  writer per peer; a pull only `git fetch`es the source)
+- picks uniform among useful directed links, greedy
+- K = 10 gives <= 60 pulls per action, ~58 needed: saturated,
+  stragglers carry over (mock: 10 waves every action)
+- old loop (steps 2-3 in rounds, random matchings, skip
+  checks): replaced; its runs stay as records in Order
+- simulated (old loop, no freechains, 1 action per loop):
     - an action reaches all 59 in ~11 rounds (p90 16)
     - fork share by k: 1 -> 100%, 4 -> 79%, 8 -> 27%,
       12 -> 7%, 16 -> 2.5%, 24 -> 0% (tpd-21: 14-18%)
-- short partitions come free (random pairs skip peers for a
-  few rounds); long ones are scheduled
+- long partitions are scheduled
 - `p2p/p2p.lua` reusing each corpus event stream; single-peer
   drivers untouched
 
@@ -237,6 +239,11 @@
         - est. 5k slice ~7 h, full `adhd` ~2 days at 5 s/action
     - [x] same test without the skip check (26/10/06): too
       slow, reverted -> skip check stays
+    - [x] loop rewritten as waves of 6 lanes (see Loop)
+        - post and sync times, ff vs mg, min/avg/max
+        - mock harness (fake freechains/git): 20 actions,
+          constraints hold, drain 2 waves, PASS
+    - [ ] simple test with waves, 20 actions (run by the user)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -268,24 +275,28 @@
     - ~4 min for 20 actions; ends with `== PASS` or `== FAIL`
 - knobs: edit `p2p/config.lua` (table `G`, no env), one
   comment per field
-    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (360), `RMAX` (40),
+    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (360), `RMAX` (100),
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
-    - `. N  <leaf>-><mid>  rounds=R  pulls=P  skips=S  Ts`
-        - rounds: run for this action (< k: early stop)
-        - pulls: real syncs for this action
-        - skips: pulls skipped by the HEAD check, this action
+    - `. N Ts  <leaf>-><mid>  [W]  post=  pulls=  ff[n]=  mg[n]=
+      idle=`
         - T: wall secs of this action
-    - `== N  pulls=  skips=  Ts`: totals every 10 actions
-    - `== END drain rounds=R`: rounds after the last action
-      until all HEADs agree
-        - drain not converged after RMAX rounds: abort
-    - `== END ...`: rounds median/max, total pulls, steps,
-      times; peers whose `list order` differs; `reps`
-      mismatches
-    - a failed pull aborts: `step <tag> : pull <to> <- <from>
-      : rc= <err>`
+        - W: waves run for this action (< K: early stop)
+        - post: post time (s)
+        - pulls: syncs run in this action's waves
+        - ff/mg: fast-forward / merge syncs, count and
+          min/avg/max secs
+        - idle: lane slots left empty (no useful pull)
+    - `== N Ts  post=min/avg/max  pulls=  ff[n]=  mg[n]=
+      idle=`: totals every 10 actions
+    - `== END drain waves=W`: waves after the last action
+        - not converged after RMAX waves: abort
+    - `== END ...`: waves median/max, pulls, waves, wave wall
+      time, idle; peers whose `list order` differs; `reps`
+      mismatches; PASS also needs N_ACT posts in the order
+    - a failed task aborts: `wave : pull <to> <- <from> :
+      rc= <err>` or `wave : post <leaf> : rc= <out>`
 - files: settings `p2p/config.lua`, topology `p2p/topo.lua`,
   diagram `p2p/hubs50.dia`, peers
   `p2p/.freechains-p2p-<mode>/pNN` (ignored), logs
@@ -298,6 +309,7 @@
 - 1. fork metric in `p2p.lua`: per action, does the author
   hold every earlier action (no fork)? plus branches in
   `list dag` at the end
+    - cheap now: the author lacks an active action -> fork
 - 2. MODE=corpus in `p2p.lua`
     - input: a `lemmy-events.py` TSV (`SRC=`, as
       `lemmy-simple.lua`)
@@ -306,11 +318,11 @@
     - kinds as `lemmy-simple.lua`: post, remove (revoke
       `--why`), restore (unrevoke `--file`), delete (free
       self-revoke); ban/addmod counted only
-    - final drain: rounds after the last action until all
-      HEADs agree, reported (convergence metric)
-    - rounds per action: k = (gap to next action) / D, early
-      stop on equal HEADs, cap RMAX
-    - sweep every WINDOW actions on every peer (in lanes)
+    - final drain: waves after the last action until every
+      peer holds every action, reported (convergence metric)
+    - waves per action: K = (gap to next action) / D, early
+      stop when nothing is missing
+    - sweep every WINDOW actions on every peer (in waves)
 - 3. smoke: `adhd` first 500 events, D = 300 (5 min)
 - 4. 5k slice: calibrate D for ~10-20% forks (tpd-21:
   14-18%)
