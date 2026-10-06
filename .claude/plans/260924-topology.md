@@ -201,9 +201,13 @@
 - [x] redraw `p2p/hubs50.dia` as hubs-59
 - [ ] `p2p/p2p.lua`: the loop above, parallel steps; the
   hubs-59 wiring fixed in the driver (as in `hubs50.dia`)
+    - [x] written, MODE=simple only; `DUMP=1` prints the 108
+      links, identical to the diagram's (checked)
+    - [ ] MODE=corpus (TSV stream, k = gap / d)
 - [ ] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
+    - run: `cd p2p && N_ACT=10 lua5.4 p2p.lua` (~15 min est.)
 - [ ] 59 peers, 5k slice: calibrate d
 - [ ] 59 peers, full `adhd`: chosen d
 - [ ] partitions: 2-3 mids x 1 day | 8 days
