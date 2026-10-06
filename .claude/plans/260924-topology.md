@@ -213,6 +213,9 @@
     - [x] comments without `;`, one phrase per line
     - [x] shorter output: `.` lines, pulls per action,
       cur/tot secs; no setup line, `ok` or skips
+    - [x] skips and secs per action, totals every 10 actions;
+      `N_ACT` 20
+    - [ ] simple test, 20 actions (run by the user)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -241,17 +244,19 @@
 - ONE run at a time (CPU-bound; timings)
 - simple test (artificial posts):
     - `cd p2p && lua5.4 p2p.lua > logs/simple-N.log 2>&1`
-    - ~2 min for 10 actions; ends with `== PASS` or `== FAIL`
+    - ~4 min for 20 actions; ends with `== PASS` or `== FAIL`
 - knobs: edit `p2p/config.lua` (table `G`, no env), one
   comment per field
-    - `MODE`, `N_ACT` (10), `GAP` (3600), `D` (60), `RMAX` (40),
+    - `MODE`, `N_ACT` (20), `GAP` (3600), `D` (60), `RMAX` (40),
       `LANES` (6), `SEED` (1), `DUMP`, `ALIAS`, `BASE`, `T0`
 - `DUMP = true`: print the 108 links and exit
 - output lines:
-    - `. N  <leaf>-><mid>  rounds=R  pulls=P  cur/tot`
+    - `. N  <leaf>-><mid>  rounds=R  pulls=P  skips=S  Ts`
         - rounds: until all 59 HEADs agree (simple mode)
         - pulls: real syncs for this action (58 expected)
-        - cur/tot: wall secs of this action / since start
+        - skips: pulls skipped by the HEAD check, this action
+        - T: wall secs of this action
+    - `== N  pulls=  skips=  Ts`: totals every 10 actions
         - not converged after RMAX rounds: abort
     - `== END ...`: rounds median/max, total pulls, steps,
       times; peers whose `list order` differs; `reps`

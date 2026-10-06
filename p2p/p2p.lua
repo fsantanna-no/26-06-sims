@@ -435,7 +435,7 @@ for a = 1, G.N_ACT do
     local ts = G.T0 + a*G.GAP
     local l  = LEAF[math.random(#LEAF)]
     AUTH[l]  = true
-    local ta, pa = now(), STATS.pulls
+    local ta, pa, sa = now(), STATS.pulls, STATS.skips
     -- 1. the leaf acts, and its own mid pulls it
     local h = exec("freechains --root=" .. root(l) .. " --now=" .. ts ..
         " chain '" .. G.ALIAS .. "' post --sign=" .. KEYS .. "/" .. NAME[l] ..
@@ -446,9 +446,13 @@ for a = 1, G.N_ACT do
     local r, ok = rounds(ts)
     R[#R+1] = r
     assert(ok, "act " .. a .. " : not converged after " .. r .. " rounds")
-    print(string.format(". %5d  %s->%s  rounds=%02d  pulls=%02d  %ds/%ds",
+    print(string.format(". %5d  %s->%s  rounds=%02d  pulls=%02d  skips=%04d  %ds",
         a, NAME[l], NAME[MID[HOME[l]+1]], r, STATS.pulls - pa,
-        math.floor(now() - ta), math.floor(now() - t0)))
+        STATS.skips - sa, math.floor(now() - ta)))
+    if a % 10 == 0 then
+        print(string.format("== %d  pulls=%d  skips=%d  %ds",
+            a, STATS.pulls, STATS.skips, math.floor(now() - t0)))
+    end
 end
 
 -------------------------------------------------------------------------------

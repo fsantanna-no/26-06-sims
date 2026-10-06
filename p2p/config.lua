@@ -5,7 +5,7 @@ local MODE = 'simple'       -- simple | corpus (not yet)
 
 return {
     MODE  = MODE,
-    N_ACT = 10,             -- simple: number of actions
+    N_ACT = 20,             -- simple: number of actions
     GAP   = 3600,           -- simple: chain secs between actions
     D     = 60,             -- chain secs per round
     RMAX  = 40,             -- max rounds per action
