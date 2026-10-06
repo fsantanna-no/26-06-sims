@@ -200,14 +200,22 @@
 - [x] revisit Sizing after the lemmy P2P smoke
 - [x] redraw `p2p/hubs50.dia` as hubs-59
 - [ ] `p2p/p2p.lua`: the loop above, parallel steps; the
-  hubs-59 wiring fixed in the driver (as in `hubs50.dia`)
+  hubs-59 wiring in `p2p/topo.lua` (as in `hubs50.dia`)
     - [x] written, MODE=simple only; `DUMP=1` prints the 108
       links, identical to the diagram's (checked)
     - [ ] MODE=corpus (TSV stream, k = gap / d)
-- [ ] simple test (artificial posts): init 59 peers, a few
+- [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
-    - run: `cd p2p && N_ACT=10 lua5.4 p2p.lua` (~15 min est.)
+    - [x] run 1 (26/10/05): PASS in 127 s (`p2p/logs/
+      simple-1.log`)
+        - 10 actions, all converged; rounds median 11, max 20
+          (simulated: 11, p90 16)
+        - exactly 58 pulls per action (one per other peer),
+          12,998 skipped by the HEAD check, 0 fails
+        - same `list order` on all 59 peers, same `reps` for
+          all 9 authors
+        - ~10 s per action (estimate was 15-25 s)
 - [ ] 59 peers, 5k slice: calibrate d
 - [ ] 59 peers, full `adhd`: chosen d
 - [ ] partitions: 2-3 mids x 1 day | 8 days

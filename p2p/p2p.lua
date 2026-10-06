@@ -1,8 +1,8 @@
 #!/usr/bin/env lua5.4
 
 -- P2P replay on hubs-59 (see `hubs50.dia`): 5 supers (fully
--- connected), 9 mids M1..M9 (each on its 2 nearest supers; Mi
--- carries i leaves), 45 leaves; edge leaves also on the
+-- connected), 9 mids M01..M09 (each on its 2 nearest supers;
+-- Mi carries i leaves), 45 leaves; edge leaves also on the
 -- neighbouring mid; sibling links in fans of 4+ leaves.
 -- Loop per action:
 --  1. a leaf acts; its mid pulls it
@@ -63,12 +63,16 @@ end
 
 -------------------------------------------------------------------------------
 -- topology: hubs-59 (fixed, as drawn in hubs50.dia)
+-- peer ids: S01-S05 = 0-4, M01-M09 = 5-13, leaves L14-L58 = 14-58
+
+local TOPO = dofile((arg[0]:match("^(.*)/") or ".") .. "/topo.lua")
+
 
 local NS, NM = 5, 9
-local SUP, MID, LEAF = {}, {}, {}   -- peer ids (0-based)
-local NAME, TIER = {}, {}
-local EDGES = {}                    -- {a, b, kind}
-local ADJ = {}
+local SUP, MID, LEAF = {}, {}, {}   -- peer ids, by tier
+local NAME, TIER, HOME = {}, {}, {} -- HOME: leaf -> mid index (0-based)
+local EDGES, ADJ, MIDS = {}, {}, {} -- MIDS: leaf -> mid ids, own first
+local CROSS = {}
 
 --[[
 -- Record an undirected link.
@@ -86,87 +90,37 @@ local function link (a, b, kind)
     ADJ[b][#ADJ[b]+1] = a
 end
 
-local N = 0
-for i = 0, NS-1 do
-    SUP[#SUP+1] = N; NAME[N] = 'S' .. i; TIER[N] = 'S'; N = N + 1
-end
-for m = 0, NM-1 do
-    MID[#MID+1] = N; NAME[N] = 'M' .. (m+1); TIER[N] = 'M'; N = N + 1
-end
-for p = 0, N-1 do ADJ[p] = {} end
-
--- supers: fully connected
-for i = 1, NS do
-    for j = i+1, NS do link(SUP[i], SUP[j], 'SS') end
-end
-
--- mids: evenly spaced (40 deg) clockwise from 70 deg, interleaved
--- M1 M6 M2 M7 M3 M8 M4 M9 M5; each on its 2 bracketing supers
-local SLOTS = { 0, 5, 1, 6, 2, 7, 3, 8, 4 }
-local ANG = {}
-for k, m in ipairs(SLOTS) do
-    ANG[m] = 70 - 40*(k-1)
-end
-for m = 0, NM-1 do
-    local t = (90 - ANG[m]) % 360           -- clockwise from S0
-    local i = math.floor(t / 72)
-    link(MID[m+1], SUP[i % 5 + 1], 'SM')
-    link(MID[m+1], SUP[(i+1) % 5 + 1], 'SM')
-end
-
--- leaves: Mi carries i leaves (ids after the mids)
-local FAN, HOME, ANGL = {}, {}, {}
-for m = 0, NM-1 do
-    FAN[m] = {}
-    local n = m + 1
-    for j = 0, n-1 do
-        local l = N
-        NAME[l] = 'L' .. l; TIER[l] = 'L'; ADJ[l] = {}
-        LEAF[#LEAF+1] = l; FAN[m][#FAN[m]+1] = l; HOME[l] = m
-        ANGL[l] = ANG[m] + (j - (n-1)/2) * 4.3
-        link(l, MID[m+1], 'LM')
-        N = N + 1
+local N = NS + NM + 45
+for p = 0, N-1 do
+    ADJ[p] = {}
+    if p < NS then
+        SUP[#SUP+1] = p; NAME[p] = string.format('S%02d', p + 1); TIER[p] = 'S'
+    elseif p < NS + NM then
+        MID[#MID+1] = p; NAME[p] = string.format('M%02d', p - NS + 1); TIER[p] = 'M'
+    else
+        LEAF[#LEAF+1] = p; NAME[p] = 'L' .. p; TIER[p] = 'L'
     end
 end
+local ID = {}
+for p = 0, N-1 do ID[NAME[p]] = p end
 
--- edge leaves also on the neighbouring mid (angular neighbours)
-local ORDER = {}
-for m = 0, NM-1 do ORDER[#ORDER+1] = m end
-table.sort(ORDER, function (a, b) return ANG[a] % 360 < ANG[b] % 360 end)
-local CROSS = {}
-for i, m in ipairs(ORDER) do
-    for _, nb in ipairs{ ORDER[(i-2) % NM + 1], ORDER[i % NM + 1] } do
-        local best, bd
-        for _, l in ipairs(FAN[m]) do
-            local d = math.abs(((ANGL[l] - ANG[nb] + 180) % 360) - 180)
-            if not bd or d < bd then best, bd = l, d end
-        end
-        local dup = false
-        for _, c in ipairs(CROSS) do
-            if (c[1] == best and c[2] == nb) or (#FAN[m] == 1 and c[1] == best) then
-                dup = true
+for p = 0, N-1 do
+    for _, x in ipairs(TOPO[NAME[p]]) do
+        local q = ID[x]
+        local kind = TIER[p] .. TIER[q]
+        if kind == 'MS' then
+            kind = 'SM'
+        elseif kind == 'LM' then
+            if MIDS[p] then              -- second mid: neighbouring
+                kind = 'LX'
+                table.insert(MIDS[p], q)
+                CROSS[#CROSS+1] = { p, x }
+            else                         -- first mid: own
+                HOME[p], MIDS[p] = q - NS, { q }
             end
         end
-        if not dup then
-            CROSS[#CROSS+1] = { best, nb }
-            link(best, MID[nb+1], 'LX')
-        end
+        link(p, q, kind)
     end
-end
-
--- sibling links: fans of n >= 4 leaves get k adjacent pairs
-local KSIB = { [4]=2, [5]=2, [6]=3, [7]=3, [8]=4, [9]=4 }
-for m = 0, NM-1 do
-    for i = 0, (KSIB[m+1] or 0) - 1 do
-        link(FAN[m][2*i+1], FAN[m][2*i+2], 'LL')
-    end
-end
-
--- mids of each leaf (own first, then the neighbouring one)
-local MIDS = {}
-for _, l in ipairs(LEAF) do MIDS[l] = { MID[HOME[l]+1] } end
-for _, c in ipairs(CROSS) do
-    table.insert(MIDS[c[1]], MID[c[2]+1])
 end
 
 if DUMP then
@@ -447,7 +401,7 @@ local function rounds (ts)
 end
 
 -------------------------------------------------------------------------------
--- setup: S0 inits, the others clone from an already created
+-- setup: S01 inits, the others clone from an already created
 -- neighbour (BFS order, one BFS layer per parallel step)
 
 os.execute("rm -rf " .. BASE)
