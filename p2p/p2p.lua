@@ -370,7 +370,7 @@ end
 --  - i0 [integer]: first index of the slice
 -- Outputs:
 --  - [integer]: count
---  - [string]: "min/avg/max" or "-"
+--  - [string]: "min/avg/max" or "-.--/-.--/-.--"
 -- Callers:
 --  - main chunk [p2p.lua]
 --]]
@@ -383,7 +383,7 @@ local function mma (xs, i0)
         if x > hi then hi = x end
     end
     if n == 0 then
-        return 0, "-"
+        return 0, "-.--/-.--/-.--"
     end
     return n, string.format("%.2f/%.2f/%.2f", lo, s/n, hi)
 end
@@ -470,14 +470,14 @@ for a = 1, G.N_ACT do
     R[#R+1] = w
     local nf, sf = mma(FF, jf)
     local nm, sm = mma(MG, jm)
-    print(string.format(". %5d %3ds  %s->%s  [%02d]  post=%.2f  pulls=%02d  ff[%d]=%s  mg[%d]=%s  idle=%d",
+    print(string.format(". %5d %3ds  %s->%s  [%02d]  post=%.2f  pulls=%02d  ff[%02d]=%s  mg[%02d]=%s  idle=%d",
         a, math.floor(now() - ta), NAME[l], NAME[m], w, POST[#POST],
         STATS.pulls - pa, nf, sf, nm, sm, STATS.idle - ia))
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)
         local nm, sm = mma(MG, 1)
-        print(string.format("== %d %4ds  post=%s  pulls=%d  ff[%d]=%s  mg[%d]=%s  idle=%d",
+        print(string.format("== %d %4ds  post=%s  pulls=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
             a, math.floor(now() - t0), sp, STATS.pulls, nf, sf, nm, sm,
             STATS.idle))
     end

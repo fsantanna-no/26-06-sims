@@ -289,6 +289,8 @@
                 - p2p 20 actions: PASS, 0 of 58 differ
                 - all 59 peers = a fresh clone
                 - repro 8 of 8 attempts agree
+                - freechains `make tests`: all pass (user)
+    - [x] fixed-width ff/mg fields (26/10/06)
             - reconfirmed on fresh `main` install (26/10/06):
               p2p 3 of 58 differ (`p2p/logs/waves-main.log`);
               repro 4 of 6 attempts diverge
@@ -341,7 +343,8 @@
         - post: post time (s)
         - pulls: syncs run in this action's waves
         - ff/mg: fast-forward / merge syncs, count and
-          min/avg/max secs
+          min/avg/max secs; none: `-.--/-.--/-.--`
+        - counts padded: 2 digits (action), 4 (totals)
         - idle: lane slots left empty (no useful pull)
     - `== N Ts  post=min/avg/max  pulls=  ff[n]=  mg[n]=
       idle=`: totals every 10 actions
