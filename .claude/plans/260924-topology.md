@@ -277,6 +277,21 @@
               -> other reps -> other winner -> other order
             - fix idea: no snapshots during loser replay, or
               snapshot from the commit's own parents
+            - refined (26/10/06): winner reads the RUNNING
+              replay state, not the state at the fork; minimal
+              repro: same HEAD, 3 orders (merger, FF, clone),
+              on main and tree-trash
+            - plan: `/x/x/freechains/vcs/.claude/plans/
+              261006-bug-winner.md`
+            - [x] p2p runs blocked until the fix
+            - fix: freechains branch `261006-bug-winner`
+              (3befafa), installed 26/10/06 14:36
+                - p2p 20 actions: PASS, 0 of 58 differ
+                - all 59 peers = a fresh clone
+                - repro 8 of 8 attempts agree
+            - reconfirmed on fresh `main` install (26/10/06):
+              p2p 3 of 58 differ (`p2p/logs/waves-main.log`);
+              repro 4 of 6 attempts diverge
         - old loop PASSed (k = 10): likely luck, same risk
         - user rerun: identical (same 4 peers): fixed repro
           for the upstream fix
