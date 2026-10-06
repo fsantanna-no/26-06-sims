@@ -3,102 +3,98 @@
 - run the replays on MANY peers, not a single root
 - measure what only multiple peers can show:
   forks, convergence, hard forks, wire cost, churn recovery
-- NOT a reproduction of earlier topologies; the harness takes
-  ANY arrangement
-- 40 peers: 5 shapes joined directly (decided 26/10/05)
+- NOT a reproduction of earlier topologies
+- 59 peers in one super-peer topology, hubs-59 (decided
+  26/10/05)
 
 # What freechains changes
 
 - NO real-time deadline: network latency only moves wall
   clock, not chain semantics (no NetEm)
-- the fork-generating knobs are in CHAIN time: how many events
-  a peer posts before syncing, and how long a partition lasts
+- the fork-generating knobs are in CHAIN time: how many sync
+  rounds fit between actions, and how long a partition lasts
   against `time.fork` (7 days)
 - virtual time stays dataset-driven (`--now=<ts>`), so peers
   share a monotone clock even while partitioned
 
-# Harness (arrangement-agnostic)
+# Topology: hubs-59 (26/10/05)
 
-- 40 peers, one `--root` each, full replica of the chain
-- sync = pull from a neighbour's chain dir (`sync recv <dir>`),
-  no daemons (as `lemmy/lemmy-p2p.lua`)
-- SEQUENTIAL: one freechains process at a time (no races,
-  stable timings)
-- inputs (files), no topology built in:
-    - edges: any graph, directed edges allowed (one-way links)
-    - schedule: edges/peers down and up in chain time (churn,
-      partitions)
-    - placement: author -> peer
-- sync policy: FLOOD in chain time with per-hop delay d
-    - after an event at ts, its peer's neighbours pull at
-      ts + d, theirs at ts + 2d, ... (discrete-event queue,
-      interleaved with later events)
-    - pull only from a neighbour that has something new (no
-      empty syncs)
-    - final rounds until all `list order` agree
-- why not "every C events": `adhd` has ~27 events/day, so 10
-  events ~ 9 h per hop, ~4-5 days across the ring: close to
-  `time.fork` (7 days), forks on nearly every event
+- 3 tiers, diameter 5 (leaf-mid-super-super-mid-leaf)
+    - 5 supers (S): fully connected core, 10 links
+    - 9 mids (M1-M9): each on 2 neighbouring supers (no mid
+      cut off by one super down)
+    - 45 leaves (L): M1..M9 carry 1..9 leaves (skew: big vs
+      small instances)
+    - cross links: the 2 edge leaves of each fan also link to
+      the neighbouring mid on their side -> 17 leaves on 2
+      mids (Gnutella leaves: up to 3 ultrapeers; Yang and
+      Garcia-Molina: 2-redundancy), 28 on 1 mid (KaZaA-like)
+    - sibling links in fans >= 4 leaves (adjacent pairs):
+      4 -> 2, 5 -> 2, 6 -> 3, 7 -> 3, 8 -> 4, 9 -> 4 (18 links;
+      local links, e.g. LAN or Scuttlebutt; none in measured
+      super-peer networks)
+    - 108 links; all pairs mean 3.4 hops, max 5; leaf to leaf
+      mean 3.8 (31% at 5)
+- as Monero's core-periphery, Kazaa, Skype; Lemmy-like
+  (instances = mids, users = leaves)
+- placement: authors UNIFORM over the 45 leaves (sticky)
+- diagram: `p2p/hubs50.dia` (hubs-59; file name kept)
+
+# Loop (one action at a time)
+
+- 1. action: a leaf acts (`--now=ts`); its mid pulls from it
+- 2. leaves pull from their mid(s) (all at once, a dual-homed
+  leaf one mid after the other; not from a mid being written)
+  + random super pairs + random sibling pairs
+- 3. random mid/super pairs (matching on M-S and S-S links)
+- repeat 2-3 k times, then the next action
+    - k = (gap to the next action) / d, d = chain time of one
+      round (e.g. d = 5 min -> ~10 rounds per `adhd` gap)
+    - stop early once every peer has the same HEAD
+- within a step: parallel, ONE writer per peer, reads shared
+  (safe: a pull only `git fetch`es the source); steps in
+  sequence
+- skip a pull when the receiver already has the source's HEAD
+  commit (`git cat-file -e`, ms)
+- simulated (no freechains, 1 action per loop):
+    - an action reaches all 59 in ~11 rounds (p90 16)
+    - fork share by k: 1 -> 100%, 4 -> 79%, 8 -> 27%,
+      12 -> 7%, 16 -> 2.5%, 24 -> 0% (tpd-21: 14-18%)
+- short partitions come free (random pairs skip peers for a
+  few rounds); long ones are scheduled
 - `p2p/p2p.lua` reusing each corpus event stream; single-peer
   drivers untouched
 
-# Arrangement: ring of 5 shapes, joined directly (26/10/05)
+# Partitions (scheduled)
 
-- order (ring, the last wraps to the first):
-    - cycle, 6 peers: single ring; fixed
-    - random, 6 peers: Erdos-Renyi, avg degree ~3, REDRAWN
-      every epoch (e.g. 1 day of chain time); gateways kept;
-      ~9 links per epoch: noisy, may split (= partition)
-    - star, 7 peers: 1 hub + 6 leaves; hub = both gateways;
-      fixed
-    - complete, 6 peers: fully connected (multi-cycle); fixed
-    - hubs, 15 peers: super-peers, 3 tiers; fixed
-        - 4 supers fully connected (core); gateways = 2 supers
-        - 3 mids, each on 2 supers
-        - 8 leaves on the mids (3/3/2), one link each
-        - inside worst path: leaf-mid-super-super-mid-leaf (5)
-        - as Monero's core-periphery, Kazaa, Skype
-- 40 peers; NO separators: OUT gateway of a shape linked
-  directly to the IN gateway of the next (1 hop)
-- gateways IN and OUT on one axis (no zig-zag); the cycle and
-  complete put them opposite (3 hops apart in the cycle)
-- worst path ~8-9 hops (half the ring); Bitcoin ~5,
-  Ethereum 3-4
-- partitions/churn: the ring survives one inter-shape link
-  down; two links down split it in two
-- dropped: rita (= cycle + complete + line), separators;
-  small-world, nebula, scale-free (Barabasi-Albert): better
-  as standalone, larger runs (a power law needs 100s of nodes)
-- hubs holds 15 of 40 peers (38%): with uniform placement it
-  weighs more in the overall results
-- placement: authors UNIFORM over all 40 peers (sticky)
-- diagram: `p2p/topology.dia` (40 peers, as above)
-- generator: `p2p/topo.py` (sizes, seed) -> `edges.txt` +
-  `schedule.txt` (random epochs)
+- cut 2-3 mids from their supers: each mid + its
+  single-homed leaves is an island (e.g. M1, M5, M9);
+  dual-homed leaves fall back to their other mid; siblings
+  keep syncing among themselves
+- durations: 1 day (< `time.fork`) | 8 days (> `time.fork`:
+  hard forks and recovery cost on reconnect)
+- contrast: one super down partitions nothing (every mid has
+  a second super)
 
 # Parameters
 
-- peers: 40 (smaller counts only for smoke)
-- per-hop delay d: 1 s (Bitcoin-like) | 1 min | 1 h (laptops
-  syncing hourly)
-    - fork share ~ 1 - exp(-rate x d x hops), rate ~1.1/h:
-      ~0.4% | ~20% | ~100% at 12 hops (tpd-21: 14-18%)
-- partition: none | 1 day | 8 days (crosses `time.fork`)
-- corpus slice: 5k events for sweeps; full `adhd` (33k) for
-  the chosen arrangements
+- peers: 59 (smaller counts only for smoke)
+- d (chain time per round): picks k and so the fork share;
+  calibrate to ~10-20% forks (tpd-21: 14-18%)
+- partition: none | 2-3 mids x 1 day | 2-3 mids x 8 days
+- corpus slice: 5k events first; full `adhd` (33k) after
 
 # Metrics
 
 - fork ratio: branches in `list dag` over total actions
-  (tpd-21 item c: 18% chat, 14% news)
 - convergence: identical `list order` across peers, and the
-  number of sync rounds needed after the last event
+  rounds needed after the last event
 - hard forks: syncs refused as `hard fork`, and the repost
   cost to recover
 - wire cost: bytes per sync (git pack sizes) and per event;
   states are local so they never travel
-- churn recovery: syncs and wall time for a returning peer
-  to match the others' order
+- churn recovery: rounds and wall time for an island to match
+  the others' order after reconnecting
 - reps divergence: max spread of a member's reps across
   peers before convergence
 
@@ -109,20 +105,14 @@
 - tree-trash single peer (lemmy open): 0.22 s/ev flat
 - per peer, full `adhd`: 278 MB chain at END + ~50 MB loose
   (sweep every 500 events) = ~0.33 GB; keys shared (59 MB)
-- RAM: ~100 MB peak (`list order` on the full chain), constant
-  in the number of peers (sequential, no daemons)
-- cost model: every action runs at its author and is replayed
-  at every other peer -> CPU ~ events x peers x replay cost
-    - MEASURED (lemmy P2P smoke, 2k-action chain): replayed
-      action ~0.15 s; empty sync 0.5 s, 28 MB
-    - flood pulls only where something is new: no empty
-      syncs
-    - empty-sync cost may grow with chain size: to check
-- 40 peers, flood (39 replays x ~0.65 s ~ 25 s per event):
-    - 5k slice: ~1.5 days, ~2 GB disk
-    - full `adhd`: ~9-10 days, ~13 GB disk
-- ceiling: ~400 peers on full `adhd` (disk, 30 GB spare);
-  more on smaller slices; time is not a constraint
+    - 59 peers: ~20 GB disk
+- MEASURED (lemmy P2P smoke): replayed action ~0.15 s; empty
+  sync 0.5 s, 28 MB (skipped by the HEAD check)
+- floor: every peer replays every action, 58 x ~0.1 s; with
+  parallel steps on ~4-6 effective cores ~1-2 s per action
+- full `adhd` ~1-2 days; 5k slice a few hours (to confirm)
+- RAM: ~30-100 MB per concurrent process; ~2 GB at 20
+  concurrent
 
 # References (real P2P, 26/10/05)
 
@@ -193,22 +183,26 @@
       `mktemp`) AND a chain lock (`flock`) for writers
     - plan written: `/x/x/freechains/vcs/.claude/plans/
       261005-races.md` (readers-writer lock, temps, CAS)
-- [ ] revisit Sizing after the lemmy P2P smoke (replay cost,
-  empty-sync cost)
-- [ ] `p2p/topo.py`: ring of 5 shapes -> edges + schedule
-- [ ] `p2p/p2p.lua` + edges/schedule/placement file formats
-- [ ] smoke: 5 peers, 1k slice, complete graph, d = 1 min
-- [ ] 40 peers, 5k slice: d = 1 s | 1 min | 1 h
-- [ ] 40 peers, full `adhd`: chosen d
+- [x] revisit Sizing after the lemmy P2P smoke
+- [x] redraw `p2p/hubs50.dia` as hubs-59
+- [ ] `p2p/topo.py`: hubs-59 edges + partition schedule
+- [ ] `p2p/p2p.lua`: the loop above, parallel steps
+- [ ] simple test (artificial posts): init 59 peers, a few
+  actions, rounds until all HEADs agree, check `list order`
+  and `reps` identical everywhere
+- [ ] 59 peers, 5k slice: calibrate d
+- [ ] 59 peers, full `adhd`: chosen d
+- [ ] partitions: 2-3 mids x 1 day | 8 days
 - [ ] later, standalone: small-world, nebula, scale-free
   (larger, alone)
-- [ ] churn and partition runs last (they need reruns)
 
 # Won't do
 
-- reproducing rita-24 / tpd-21 (rita split into cycle,
-  complete, line)
-- all-to-all sync as the only arrangement (complete graph is
-  one input among many)
-- parallel peers (sequential is enough; time is not a limit)
+- reproducing rita-24 / tpd-21
+- the 5-shape ring (cycle, random, star, complete, hubs):
+  replaced by hubs-59; diagram `p2p/topology.dia` kept as a
+  record
+- random pairings in every tier (simulated: ~43 loops to
+  spread, every action forks)
+- flood per hop with a fixed delay (replaced by the loop)
 - real-time deadlines and time travel (no analogue here)
