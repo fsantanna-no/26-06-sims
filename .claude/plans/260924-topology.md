@@ -54,6 +54,12 @@
 - within a step: parallel, ONE writer per peer, reads shared
   (safe: a pull only `git fetch`es the source); steps in
   sequence
+    - 6 lanes per step: `( job ; job ; ... ) &` x 6, then
+      `wait`; one job per receiving peer, its pulls joined by
+      `;` (not `&&`), one exit code per pull; jobs assigned
+      longest first to the least loaded lane
+    - after each round: all 59 HEADs (`git rev-parse`); all
+      equal -> converged, skip the rest of the gap
 - skip a pull when the receiver already has the source's HEAD
   commit (`git cat-file -e`, ms)
 - simulated (no freechains, 1 action per loop):
@@ -108,8 +114,16 @@
     - 59 peers: ~20 GB disk
 - MEASURED (lemmy P2P smoke): replayed action ~0.15 s; empty
   sync 0.5 s, 28 MB (skipped by the HEAD check)
+- MEASURED concurrency (26/10/05): 24 pulls of 10 new actions
+  each (2k-action chain), 2 repetitions
+    - 1 at a time: 42.6 s (1.78 s per pull), peak 60 MB
+    - 4 lanes: 9.5 s; 6 lanes: 6.3-6.6 s (6.6x), ~190 MB
+    - 8 / 12 / 24 at once: 6.2-6.8 s (no gain), 300 / 420 /
+      760 MB (~30 MB per concurrent pull)
+    - pulls are CPU-bound: 6 lanes is the plateau; all at once
+      only costs memory
 - floor: every peer replays every action, 58 x ~0.1 s; with
-  parallel steps on ~4-6 effective cores ~1-2 s per action
+  6 lanes ~1-2 s per action
 - full `adhd` ~1-2 days; 5k slice a few hours (to confirm)
 - RAM: ~30-100 MB per concurrent process; ~2 GB at 20
   concurrent
@@ -185,8 +199,8 @@
       261005-races.md` (readers-writer lock, temps, CAS)
 - [x] revisit Sizing after the lemmy P2P smoke
 - [x] redraw `p2p/hubs50.dia` as hubs-59
-- [ ] `p2p/topo.py`: hubs-59 edges + partition schedule
-- [ ] `p2p/p2p.lua`: the loop above, parallel steps
+- [ ] `p2p/p2p.lua`: the loop above, parallel steps; the
+  hubs-59 wiring fixed in the driver (as in `hubs50.dia`)
 - [ ] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -205,4 +219,6 @@
 - random pairings in every tier (simulated: ~43 loops to
   spread, every action forks)
 - flood per hop with a fixed delay (replaced by the loop)
+- `p2p/topo.py` generator: topology is fixed; other knobs
+  (partitions, d) added on demand
 - real-time deadlines and time travel (no analogue here)
