@@ -167,7 +167,7 @@
 
 # Order
 
-- [ ] `p2p/race.sh`: hub + concurrent senders + local posts;
+- [x] `p2p/race.sh`: hub + concurrent senders + local posts;
   check every post in hub `list order`, `reps` still works
     - [x] written; first run (8 senders x 5 posts, 10 hub
       posts) confirmed races before any loss count:
@@ -203,7 +203,7 @@
   hubs-59 wiring in `p2p/topo.lua` (as in `hubs50.dia`)
     - [x] written, MODE=simple only; `DUMP=1` prints the 108
       links, identical to the diagram's (checked)
-    - [ ] MODE=corpus (TSV stream, k = gap / d)
+    - [ ] MODE=corpus (see Next steps)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
   and `reps` identical everywhere
@@ -221,6 +221,55 @@
 - [ ] partitions: 2-3 mids x 1 day | 8 days
 - [ ] later, standalone: small-world, nebula, scale-free
   (larger, alone)
+
+# How to run
+
+- build: freechains 260914-tree-trash installed
+    - `--version` says v0.21.0 for both builds: check
+      `/usr/local/share/lua/5.4/freechains/chain/state.lua`
+      has ~1181 lines (main: 89)
+- ONE run at a time (CPU-bound; timings)
+- simple test (artificial posts):
+    - `cd p2p && N_ACT=10 lua5.4 p2p.lua > logs/simple-N.log
+      2>&1`
+    - ~2 min for 10 actions; ends with `== PASS` or `== FAIL`
+- knobs (env): `N_ACT` (10), `GAP` chain secs between actions
+  (3600), `D` chain secs per round (60), `RMAX` (40), `LANES`
+  (6), `SEED` (1), `BASE` (`./.freechains-p2p-simple`)
+- `DUMP=1 lua5.4 p2p.lua`: print the 108 links and exit
+- output lines:
+    - `== act N  <leaf> -> <mid>  rounds=R ok  pulls= skips=
+      fails= elapsed=`
+    - `== END ...`: rounds median/max, pulls, skips, fails;
+      peers whose `list order` differs; `reps` mismatches
+- files: topology `p2p/topo.lua`, diagram `p2p/hubs50.dia`,
+  peers `p2p/.freechains-p2p-<mode>/pNN` (ignored), logs
+  `p2p/logs/` (ignored); BASE is wiped on start
+- race test: `p2p/race.sh [senders] [posts] [hub-posts]`, env
+  `TMP` (fresh dir), `ROUNDS` (3), `PORT` (18399)
+
+# Next steps
+
+- 1. fork metric in `p2p.lua`: per action, does the author
+  hold every earlier action (no fork)? plus branches in
+  `list dag` at the end
+- 2. MODE=corpus in `p2p.lua`
+    - input: a `lemmy-events.py` TSV (`SRC=`, as
+      `lemmy-simple.lua`)
+    - authors placed uniformly on the 45 leaves (sticky,
+      `SEED`); moderators too
+    - kinds as `lemmy-simple.lua`: post, remove (revoke
+      `--why`), restore (unrevoke `--file`), delete (free
+      self-revoke); ban/addmod counted only
+    - rounds per action: k = (gap to next action) / D, early
+      stop on equal HEADs, cap RMAX
+    - sweep every WINDOW actions on every peer (in lanes)
+- 3. smoke: `adhd` first 500 events, D = 300 (5 min)
+- 4. 5k slice: calibrate D for ~10-20% forks (tpd-21:
+  14-18%)
+- 5. full `adhd` (~1-2 days est.)
+- 6. partitions: cut M01, M05, M09 for 1 day, then 8 days
+- 7. results: `p2p/RESULTS.md`
 
 # Won't do
 
