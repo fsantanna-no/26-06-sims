@@ -17,6 +17,7 @@
 -- In a wave, writers are distinct, and no writer is a source.
 -- Holders per action are tracked here (no git checks).
 -- After the last action, the pending timers drain.
+-- Every SWEEP actions, all peers sweep (pack loose objects).
 -- MODE=simple: artificial inline posts.
 -- MODE=corpus: the first LIMIT events of SRC.tsv (posts only).
 -- SINGLE RUN: G.BASE is wiped on start.
@@ -639,6 +640,36 @@ local function lacks (p)
     return n
 end
 
+--[[
+-- Sweep every peer (erase revoked payloads, pack loose objects),
+-- in LANES lanes; peers are idle between actions (one writer).
+-- Inputs:
+--  - none
+-- Outputs:
+--  - [number]: wall secs
+-- Callers:
+--  - main chunk [p2p.lua]: every G.SWEEP actions
+--]]
+local function sweep ()
+    local lanes = {}
+    for p = 0, N-1 do
+        local i = p % G.LANES + 1
+        lanes[i] = lanes[i] or {}
+        table.insert(lanes[i], "freechains --root=" .. root(p) ..
+            " chain " .. G.ALIAS .. " sweep > /dev/null 2>&1")
+    end
+    local sh = {}
+    for _, l in pairs(lanes) do
+        sh[#sh+1] = "( " .. table.concat(l, " ; ") .. " ) &"
+    end
+    local f = io.open(G.BASE .. '/sweep.sh', 'w')
+    f:write(table.concat(sh, "\n") .. "\nwait\n")
+    f:close()
+    local t0 = now()
+    os.execute("bash " .. G.BASE .. "/sweep.sh")
+    return now() - t0
+end
+
 local R, AUTH = {}, {}
 local t0 = now()
 local NE = #EVENTS
@@ -666,6 +697,10 @@ for a, e in ipairs(EVENTS) do
     print(string.format(". %5d %3ds  %s  [%03d]  miss=%d  post=%.2f  pulls=%02d  ff[%02d]=%s  mg[%02d]=%s",
         a, math.floor(now() - ta), NAME[l], w, miss, POST[#POST],
         STATS.pulls - pa, nf, sf, nm, sm))
+    if G.SWEEP and a % G.SWEEP == 0 then
+        print(string.format("== %d sweep %.0fs  peer %s", a, sweep(),
+            exec("du -sh " .. root(0) .. " | cut -f1")))
+    end
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)

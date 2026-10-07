@@ -2,7 +2,7 @@
 -- Loaded by p2p.lua as G.
 
 local MODE   = 'corpus'     -- simple | corpus
-local CORPUS = 'usenet'     -- corpus: chat | usenet (posts only)
+local CORPUS = 'chat'       -- corpus: chat | usenet (posts only)
 
 -- relay secs per hop (push), decided 26/10/06: chat instant,
 -- all others 60; simple: 1800 over 3600 gaps (~25-31% forks)
@@ -13,7 +13,7 @@ local RL    = RELAY[KEY]
 return {
     MODE  = MODE,
     SRC   = '../data/' .. CORPUS,  -- corpus: TSV + bodies (from p2p/)
-    LIMIT = 500,            -- corpus: first LIMIT events
+    LIMIT = 5000,           -- corpus: first LIMIT events
     N_ACT = 20,             -- simple: number of actions
     T = {
         action = 3600,      -- simple: chain secs between actions
@@ -27,6 +27,8 @@ return {
     -- simple: relay 1800 over 3600 gaps forks 25-31% (merges);
     -- tick = relay / 10
     LANES = 6,              -- tasks per wave, all in parallel
+    SWEEP = 500,            -- sweep all peers every SWEEP actions
+                            -- (keeps peers ~5 MB, not ~200 MB loose)
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 90 links and exit
     ALIAS = '/' .. KEY,     -- chain name

@@ -260,6 +260,71 @@
         - wiki, chat, se-veg: TSV conversion needed (se-veg
           votes dated by day only)
         - usenet: TSV conversion with the batch spread
+- corpus mode, posts only (26/10/06)
+    - converters: `chat/chat-events.py` -> `data/chat.tsv`
+      (155,528 `<nick>` messages, 645 nicks, UTC, sorted);
+      `usenet/use-events.py` -> `data/usenet.tsv` (33,814
+      records, 12,539 senders)
+    - usenet: 10,077 records (1995-2000) are DATE-ONLY
+      (`YYYY/MM/DD`): spread evenly over their day (1,014
+      days); plus the 2000-2007 batch spread (1,163 batches)
+        - correction: 1996-99 are not missing, only date-only
+    - `p2p.lua`: `MODE='corpus'`, `SRC`, `LIMIT`; authors
+      placed uniformly and sticky on leaves, one key per
+      author; posts from body files (`postf`); `T0` = first
+      event - 3600; reps checked for the first 10 authors
+    - `config.lua`: `CORPUS` picks relay (chat 0, usenet 60)
+      and tick (relay / 10, min 1)
+    - usenet, 500 events (1987-88; `p2p/logs/usenet-500.log`):
+      PASS in 41 min (~4.9 s per action)
+        - forks 2 of 500 (0.4%), 2 merges; expected for that
+          period (long gaps)
+        - 28,786 pulls (~57.6 per action); waves 7,881, idle
+          38%; drain 16 waves
+        - ff syncs avg 0.18 -> 0.29 s (grow with the chain),
+          max 0.53 s; posts ~0.13 s
+        - same `list order` on all 59; `reps` match (10)
+    - chat, 500 events (2010-08; `p2p/logs/chat-500.log`):
+      PASS in 32 min (~3.8 s per action)
+        - forks 6 of 500 (1.2%), 6 merges; the first 500
+          have 9 same-second pairs (a fork needs the next
+          author on another leaf): instant push works
+        - 28,782 pulls (~57.6 per action); waves 5,947, idle
+          18% (1 s ticks pack better); drain 11 waves
+        - ff avg 0.19 -> 0.30 s, max 0.51; mg 0.38-0.52 s
+        - same `list order` on all 59; `reps` match (10)
+    - [x] chat 5k (26/10/06-07): STOPPED at 1,992 of 5,000
+      (`p2p/logs/chat-5k.log`); usenet 5k not started
+        - SYNC BLOWUP: s per action ~3.8 (1-500), ~6.5
+          (760-1,010), ~24.6 (1,260-1,510), ~37.7
+          (1,760-1,980); ff pull avg 0.18 -> 1.29 s, max 9.25
+        - posts stay fast: avg 0.12 -> 0.17 s, max 0.34
+        - forks 22 of 1,980 (1.1%), as expected for chat
+        - per peer: ~5,900 loose objects, 192 MB, nothing
+          packed (~207 MB): ~32 KB per object, full state
+          blobs per action in this build (`261006-bug-winner`,
+          main layout); the P2P driver never sweeps or packs
+        - probable cause (not verified): state blobs grow with
+          the chain, read/written on every pull (~58 per
+          action); single-peer main build grew too (0.17 ->
+          1.15 s/ev over 33k)
+        - peers kept: `p2p/.freechains-p2p-chat/` (for tests)
+    - [ ] fix the sync blowup before longer runs
+        - [x] test on copies of the kept peers (26/10/07)
+            - `sweep`: 208 MB (5,903 loose) -> 5.1 MB (one
+              pack), ~9.5 s per peer
+            - pull of 1 new action: raw 2.31 / 0.73 / 0.72 s,
+              swept 0.35 / 0.38 / 0.39 s
+            - likely cause: 59 x ~207 MB ~ 12 GB > ~4 GB free
+              RAM: parallel pulls waited on disk; swept peers
+              total ~300 MB (fit in the page cache)
+        - [x] periodic sweep in the driver: `G.SWEEP` (500),
+          all peers in lanes, between actions; logs `== <a>
+          sweep <s>  peer <size>`; ~95 s per sweep (~0.2 s
+          per action)
+        - [ ] rerun chat 5k with sweeps, then usenet 5k
+        - [ ] compare with tree-trash (state as git tree), but
+          it may lack the order fix of `261006-bug-winner`
 - [ ] per-tier N (supers fast, leaves slow): only if asked
 - [x] recalibrated with U(0, N) (26/10/06): adhd 59 s,
   github 68 s, wiki 22 s, usenet 13 s, se-veg 3.1 min (chat
