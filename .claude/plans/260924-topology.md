@@ -322,7 +322,42 @@
           all peers in lanes, between actions; logs `== <a>
           sweep <s>  peer <size>`; ~95 s per sweep (~0.2 s
           per action)
-        - [ ] rerun chat 5k with sweeps, then usenet 5k
+        - [x] rerun chat 5k with sweeps on `261006-bug-winner`
+          (26/10/07): STOPPED at 712 to switch build
+          (`p2p/logs/chat-5k-sweep-main-stopped.log`)
+            - sweep at 500: 18 s, peer 1.2 MB (was ~200 MB)
+            - s per action ~3.8 (1-500), ~3.9 (500-700): flat
+              (no-sweep run: ~5 and rising); ff avg 0.30 s,
+              max 0.51; forks 8 of 700 (1.1%)
+        - [x] reinstall (user, 26/10/07 08:25): tree-trash
+          (3752b78) + the bug-winner fix STAGED, uncommitted
+          (`state.lua` 1,182 lines; installed = freechains
+          working tree)
+        - [ ] chat 5k, then usenet 5k, on that build (started
+          26/10/07; `p2p/logs/chat-5k.log`, `usenet-5k.log`)
+            - posts flat (~0.19-0.20 s); fast-forward pull avg
+              per 250 actions 0.36 -> 1.01 s by 1,950 (~+0.4 s
+              per 1,000): s per action ~5 (500) -> ~14 (2,200)
+            - profile of one pull (26/10/07, scratch copy of
+              `sync.lua`, ~2,372 actions): 1.25-1.33 s, of which
+              `STATE.read`+`STATE.all` 0.42-0.51 s and payload
+              fetch 0.21-0.27 s (whole chain, even with nothing
+              new: 0.98 s), `hardfork` 0.18-0.20 s (walks the
+              last 7 days = the whole chat chain); fetch 0.18,
+              apply new commit 0.11-0.16; a post 0.21 s
+            - upstream plan: `/x/x/freechains/vcs/.claude/plans/
+              261007-sync-optim.md` (tree branch only;
+              affected set only; `hardfork` from the tips):
+              ~-70% per pull
+            - fix 2 (f271bee): `hardfork` 0.18-0.20 -> 0.03-0.04
+              s; pull 0.73-0.76 s at 2,950 actions
+            - fix 1 (staged, installed 17:04): pull 0.49-0.51 s,
+              nothing new 0.17 s; post 0.22 s
+            - chat 5k died at 2,951 (reinstall mid-run, `logs/
+              chat-5k-tree-died-2951.log`); usenet 5k stopped at 7
+              (`logs/usenet-5k-fix2-stopped.log`)
+        - [ ] chat 5k, then usenet 5k, with fix 1 + fix 2
+          (started 26/10/07 ~17:10)
         - [ ] compare with tree-trash (state as git tree), but
           it may lack the order fix of `261006-bug-winner`
 - [ ] per-tier N (supers fast, leaves slow): only if asked
@@ -602,8 +637,9 @@
 
 # How to run
 
-- build: freechains `261006-bug-winner` (75e6800) installed
-  26/10/06 19:30 (`main` layout: `state.lua` 89 lines)
+- build: freechains tree-trash (3752b78) + bug-winner fix
+  (staged, uncommitted) installed 26/10/07 08:25 (`state.lua`
+  1,182 lines); before: `261006-bug-winner` (main layout, 89)
     - `--version` says v0.21.0 for every build: check the
       installed `state.lua` (tree-trash: ~1181 lines)
     - lemmy single-peer runs used tree-trash: timings not
