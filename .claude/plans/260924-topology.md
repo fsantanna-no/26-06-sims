@@ -237,6 +237,29 @@
     - without sibling links (`p2p/logs/push-3.log`): PASS in
       111 s; waves 293, idle 604; forks 7 of 20 (35%, noise
       at 20 actions: model 25-31%), 7 merges
+- expected per corpus (26/10/06; push, hubs-59 with 90 links,
+  posts see only earlier pushes; mock on 2,000-gap slices at
+  10/30/50/70/90%; run time at ~5.5 s per action, a lower
+  bound)
+    - chat: 166,277 actions; N 0, tick 1 s; forks 1.7 / 2.6 /
+      3.5 / 2.8 / 3.3%, mean 2.8%; spread 0 s; ~10 days
+    - adhd: 33,027; N 60 s, tick 6 s; forks 22.4 / 21.0 /
+      15.3 / 21.9 / 15.4%, mean 19.2%; spread 140 s; ~2 days
+    - github: 94,006; N 60 s; forks 13.1 / 14.4 / 13.5 /
+      12.3 / 14.9%, mean 13.7%; spread 141 s; ~6 days
+    - wiki: 13,973; N 60 s; forks 16.4 / 23.5 / 31.2 / 13.8 /
+      10.7%, mean 19.1%; spread 139 s; ~21 h
+    - se-veg: 5,565; N 60 s; forks 25.6 / 9.8 / 5.3 / 4.2 /
+      4.0%, mean 9.8%; spread 142 s; ~9 h
+    - usenet (batches spread): 23,745; N 60 s; forks 1.4 /
+      7.1 / 7.4 / 3.5 / 2.6%, mean 4.4%; spread 142 s;
+      ~1.5 days
+    - event streams for corpus mode:
+        - adhd: ready (`lemmy-events.py` TSV)
+        - github: TSV ready; likes/dislikes not yet supported
+        - wiki, chat, se-veg: TSV conversion needed (se-veg
+          votes dated by day only)
+        - usenet: TSV conversion with the batch spread
 - [ ] per-tier N (supers fast, leaves slow): only if asked
 - [x] recalibrated with U(0, N) (26/10/06): adhd 59 s,
   github 68 s, wiki 22 s, usenet 13 s, se-veg 3.1 min (chat
