@@ -3,14 +3,12 @@
 -- 9 mids, each on its 2 nearest supers (Mi carries i leaves).
 -- 45 leaves.
 -- Edge leaves also link to the neighbouring mid.
--- Sibling links in fans of 4+ leaves.
 -- Peer ids (in p2p.lua): S01-S05 = 0-4, M01-M09 = 5-13,
 -- leaves L14-L58 = 14-58.
 
 -- Each peer and the peers it links to.
 -- Each link is listed once, on the lower tier.
 -- A leaf's first mid is its own, a second mid is the neighbour.
--- An L entry is a sibling.
 return {
     _ns = 5,                -- supers S01-S05
     _nm = 9,                -- mids M01-M09
@@ -36,42 +34,42 @@ return {
     L18 = { 'M03' },
     L19 = { 'M03', 'M07' },
     L20 = { 'M04', 'M09' },
-    L21 = { 'M04', 'L20' },
+    L21 = { 'M04' },
     L22 = { 'M04' },
-    L23 = { 'M04', 'M08', 'L22' },
+    L23 = { 'M04', 'M08' },
     L24 = { 'M05', 'M01' },
-    L25 = { 'M05', 'L24' },
+    L25 = { 'M05' },
     L26 = { 'M05' },
-    L27 = { 'M05', 'L26' },
+    L27 = { 'M05' },
     L28 = { 'M05', 'M09' },
     L29 = { 'M06', 'M02' },
-    L30 = { 'M06', 'L29' },
+    L30 = { 'M06' },
     L31 = { 'M06' },
-    L32 = { 'M06', 'L31' },
+    L32 = { 'M06' },
     L33 = { 'M06' },
-    L34 = { 'M06', 'M01', 'L33' },
+    L34 = { 'M06', 'M01' },
     L35 = { 'M07', 'M03' },
-    L36 = { 'M07', 'L35' },
+    L36 = { 'M07' },
     L37 = { 'M07' },
-    L38 = { 'M07', 'L37' },
+    L38 = { 'M07' },
     L39 = { 'M07' },
-    L40 = { 'M07', 'L39' },
+    L40 = { 'M07' },
     L41 = { 'M07', 'M02' },
     L42 = { 'M08', 'M04' },
-    L43 = { 'M08', 'L42' },
+    L43 = { 'M08' },
     L44 = { 'M08' },
-    L45 = { 'M08', 'L44' },
+    L45 = { 'M08' },
     L46 = { 'M08' },
-    L47 = { 'M08', 'L46' },
+    L47 = { 'M08' },
     L48 = { 'M08' },
-    L49 = { 'M08', 'M03', 'L48' },
+    L49 = { 'M08', 'M03' },
     L50 = { 'M09', 'M05' },
-    L51 = { 'M09', 'L50' },
+    L51 = { 'M09' },
     L52 = { 'M09' },
-    L53 = { 'M09', 'L52' },
+    L53 = { 'M09' },
     L54 = { 'M09' },
-    L55 = { 'M09', 'L54' },
+    L55 = { 'M09' },
     L56 = { 'M09' },
-    L57 = { 'M09', 'L56' },
+    L57 = { 'M09' },
     L58 = { 'M09', 'M04' },
 }

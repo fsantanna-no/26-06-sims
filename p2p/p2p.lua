@@ -5,7 +5,6 @@
 -- 9 mids M01..M09, each on its 2 nearest supers.
 -- Mi carries i leaves, 45 leaves in all.
 -- Edge leaves also link to the neighbouring mid.
--- Sibling links in fans of 4+ leaves.
 -- Sync rule: push with a relay delay (26/10/06).
 -- Chain time runs in ticks of T.tick: pulls due in one tick
 -- share waves (event times shift < T.tick).

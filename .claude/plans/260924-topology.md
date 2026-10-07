@@ -29,12 +29,12 @@
       the neighbouring mid on their side -> 17 leaves on 2
       mids (Gnutella leaves: up to 3 ultrapeers; Yang and
       Garcia-Molina: 2-redundancy), 28 on 1 mid (KaZaA-like)
-    - sibling links in fans >= 4 leaves (adjacent pairs):
-      4 -> 2, 5 -> 2, 6 -> 3, 7 -> 3, 8 -> 4, 9 -> 4 (18 links;
-      local links, e.g. LAN or Scuttlebutt; none in measured
-      super-peer networks)
-    - 108 links; all pairs mean 3.4 hops, max 5; leaf to leaf
-      mean 3.8 (31% at 5)
+    - no sibling links (removed 26/10/06): under push at
+      N = 60 s they changed forks by <= 0.5 pt and spread by
+      <= 3 s (adhd, github, wiki); none in measured
+      super-peer networks
+    - 90 links: 10 S-S, 18 M-S, 45 leaf-own-mid, 17
+      leaf-neighbour-mid
 - as Monero's core-periphery, Kazaa, Skype; Lemmy-like
   (instances = mids, users = leaves)
 - placement: authors UNIFORM over the 45 leaves (sticky)
@@ -234,6 +234,9 @@
     - simple test (`p2p/logs/push-2.log`, tick 180): PASS in
       97 s (push-1: 109 s); waves 362 -> 294, idle slots
       1,019 -> 642 (47% -> 36%); forks 25%, 5 merges
+    - without sibling links (`p2p/logs/push-3.log`): PASS in
+      111 s; waves 293, idle 604; forks 7 of 20 (35%, noise
+      at 20 actions: model 25-31%), 7 merges
 - [ ] per-tier N (supers fast, leaves slow): only if asked
 - [x] recalibrated with U(0, N) (26/10/06): adhd 59 s,
   github 68 s, wiki 22 s, usenet 13 s, se-veg 3.1 min (chat
@@ -250,8 +253,8 @@
 
 - cut 2-3 mids from their supers: each mid + its
   single-homed leaves is an island (e.g. M1, M5, M9);
-  dual-homed leaves fall back to their other mid; siblings
-  keep syncing among themselves
+  dual-homed leaves fall back to their other mid; without
+  sibling links each single-homed leaf is cut off alone
 - durations: 1 day (< `time.fork`) | 8 days (> `time.fork`:
   hard forks and recovery cost on reconnect)
 - contrast: one super down partitions nothing (every mid has
@@ -613,3 +616,4 @@
 - real-time deadlines and time travel (no analogue here)
 - offline leaves (sessions from the data): all leaves stay
   online; see Topology
+- sibling (leaf-leaf) links: no measurable effect under push

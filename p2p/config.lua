@@ -19,7 +19,7 @@ return {
     -- tick = relay / 10
     LANES = 6,              -- tasks per wave, all in parallel
     SEED  = 1,              -- random seed
-    DUMP  = false,          -- print the 108 links and exit
+    DUMP  = false,          -- print the 90 links and exit
     ALIAS = '/simple',      -- chain name
     BASE  = './.freechains-p2p-' .. MODE,  -- peers dir, wiped on start
     T0    = 1700000000,     -- chain time of the first action
