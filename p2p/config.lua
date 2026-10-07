@@ -1,15 +1,24 @@
 -- Settings for p2p.lua (one comment per field).
 -- Loaded by p2p.lua as G.
 
-local MODE = 'simple'       -- simple | corpus (not yet)
+local MODE   = 'corpus'     -- simple | corpus
+local CORPUS = 'usenet'     -- corpus: chat | usenet (posts only)
+
+-- relay secs per hop (push), decided 26/10/06: chat instant,
+-- all others 60; simple: 1800 over 3600 gaps (~25-31% forks)
+local RELAY = { simple = 1800, chat = 0, usenet = 60 }
+local KEY   = (MODE == 'simple') and 'simple' or CORPUS
+local RL    = RELAY[KEY]
 
 return {
     MODE  = MODE,
+    SRC   = '../data/' .. CORPUS,  -- corpus: TSV + bodies (from p2p/)
+    LIMIT = 500,            -- corpus: first LIMIT events
     N_ACT = 20,             -- simple: number of actions
     T = {
         action = 3600,      -- simple: chain secs between actions
-        relay  = 1800,      -- push delay U(0, relay) secs per hop
-        tick   = 180,       -- pulls due in one tick share waves
+        relay  = RL,        -- push delay U(0, relay) secs per hop
+        tick   = math.max(1, RL // 10),  -- pulls due in one tick share waves
     },
     -- corpus runs (decided 26/10/06): chat relay 0 (instant, tick
     -- 1: same-second messages fork, ~3%); all others relay 60,
@@ -20,7 +29,8 @@ return {
     LANES = 6,              -- tasks per wave, all in parallel
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 90 links and exit
-    ALIAS = '/simple',      -- chain name
-    BASE  = './.freechains-p2p-' .. MODE,  -- peers dir, wiped on start
-    T0    = 1700000000,     -- chain time of the first action
+    ALIAS = '/' .. KEY,     -- chain name
+    BASE  = './.freechains-p2p-' .. KEY,   -- peers dir, wiped on start
+    T0    = 1700000000,     -- simple: chain time before the first action
+                            -- (corpus: first event - 3600)
 }

@@ -17,7 +17,8 @@
 -- In a wave, writers are distinct, and no writer is a source.
 -- Holders per action are tracked here (no git checks).
 -- After the last action, the pending timers drain.
--- MODE=simple: artificial inline posts (the only mode so far).
+-- MODE=simple: artificial inline posts.
+-- MODE=corpus: the first LIMIT events of SRC.tsv (posts only).
 -- SINGLE RUN: G.BASE is wiped on start.
 -- Settings: edit config.lua (table G, no env).
 
@@ -206,10 +207,21 @@ local function script (tasks)
         "  local t1=$(date +%s%N)",
         "  echo \"post $2 0 $rc po $((t1-t0)) $(echo \"$out\" | head -1 | tr ' ' _)\" > $B/status.$1",
         "}",
+        -- postf <lane> <leaf> <ts> <key> <file>
+        "postf () {",
+        "  local T=$(printf \"$B/p%02d\" $2)",
+        "  local t0=$(date +%s%N)",
+        "  out=$(freechains --root=$T --now=$3 chain " .. G.ALIAS ..
+            " post --sign=$4 file $5 2>&1); rc=$?",
+        "  local t1=$(date +%s%N)",
+        "  echo \"post $2 0 $rc po $((t1-t0)) $(echo \"$out\" | head -1 | tr ' ' _)\" > $B/status.$1",
+        "}",
         "rm -f $B/status.*" }
     for i, t in ipairs(tasks) do
         if t[1] == 'pull' then
             sh[#sh+1] = string.format("pull %d %d %d %d &", i, t[2], t[3], t[4])
+        elseif t[6] then
+            sh[#sh+1] = string.format("postf %d %d %d %s '%s' &", i, t[2], t[3], t[4], t[6])
         else
             sh[#sh+1] = string.format("post %d %d %d %s '%s' &", i, t[2], t[3], t[4], t[5])
         end
@@ -345,6 +357,27 @@ local function mma (xs, i0)
 end
 
 -------------------------------------------------------------------------------
+-- events: { ts, user, msg | nil, file | nil } in time order
+--  - simple: N_ACT artificial posts, T.action apart, by leaves
+--  - corpus: the first LIMIT events of SRC.tsv (posts only)
+
+local EVENTS = {}
+if G.MODE == 'simple' then
+    for a = 1, G.N_ACT do
+        EVENTS[a] = { G.T0 + a*G.T.action, nil, 'simple ' .. a, nil }
+    end
+else
+    local src = DIR .. '/' .. G.SRC
+    for l in io.lines(src .. '.tsv') do
+        local ts, kind, id, user = l:match("^(%d+)\t(%a+)\t([^\t]*)\t([^\t]*)\t")
+        assert(kind == 'post', "corpus : kind " .. tostring(kind) .. " : not yet")
+        EVENTS[#EVENTS+1] = { tonumber(ts), user, nil, src .. '.bodies/' .. id }
+        if #EVENTS == G.LIMIT then break end
+    end
+    G.T0 = EVENTS[1][1] - 3600
+end
+
+-------------------------------------------------------------------------------
 -- setup: S01 inits, the others clone from an already created
 -- neighbour (BFS order, one BFS layer per parallel step)
 
@@ -377,15 +410,37 @@ end
 local ok0, n0 = heads()
 assert(ok0, "setup : clones disagree (" .. n0 .. " heads)")
 
--- one key per leaf (the authors)
-for _, l in ipairs(LEAF) do
-    os.execute("ssh-keygen -t ed25519 -N '' -C '' -f " .. KEYS .. "/" .. NAME[l] .. " -q")
+-- keys: one per leaf (simple), one per author (corpus, lazily)
+local KEYOF, PLACE, NAUTH = {}, {}, 0
+
+--[[
+-- Leaf and key of an event's author (sticky, uniform on leaves).
+-- Inputs:
+--  - user [string|nil]: author (nil: simple, a random leaf posts)
+-- Outputs:
+--  - [integer]: leaf
+--  - [string]: private key path
+-- Callers:
+--  - main chunk [p2p.lua]
+--]]
+local function author (user)
+    if user == nil then
+        local l = LEAF[math.random(#LEAF)]
+        user = NAME[l]
+        PLACE[user] = l
+    elseif not PLACE[user] then
+        PLACE[user] = LEAF[math.random(#LEAF)]
+    end
+    if not KEYOF[user] then
+        NAUTH = NAUTH + 1
+        KEYOF[user] = KEYS .. '/a' .. NAUTH
+        os.execute("ssh-keygen -t ed25519 -N '' -C '' -f " .. KEYOF[user] .. " -q")
+    end
+    return PLACE[user], KEYOF[user]
 end
 
 -------------------------------------------------------------------------------
--- simple test: N_ACT artificial posts, each followed by waves
-
-assert(G.MODE == 'simple', "mode " .. G.MODE .. " : not yet")
+-- replay: EVENTS, each preceded by the pushes due before it
 
 local HEAP, TIMER = {}, {}          -- pending fires; peer -> fire time
 
@@ -586,22 +641,23 @@ end
 
 local R, AUTH = {}, {}
 local t0 = now()
-for a = 1, G.N_ACT do
-    local ts = G.T0 + a*G.T.action
+local NE = #EVENTS
+for a, e in ipairs(EVENTS) do
+    local ts = e[1]
     local ta, pa = now(), STATS.pulls
     local jf, jm = #FF + 1, #MG + 1
     -- the pushes due strictly before this action
     local w = advance(ts)
     -- the post: fork if the author lacks earlier actions
-    local l = LEAF[math.random(#LEAF)]
-    AUTH[l] = true
+    local l, key = author(e[2])
+    AUTH[key] = true
     local miss = lacks(l)
     if miss > 0 then STATS.forks = STATS.forks + 1 end
     -- the post shares its wave with pulls due in its tick
     TICK = (math.floor(ts / G.T.tick) + 1) * G.T.tick
     due(TICK)
-    step({ { 'post', l, ts, KEYS .. "/" .. NAME[l],
-        'simple ' .. a .. ' by ' .. NAME[l] } }, ts, a)
+    step({ { 'post', l, ts, key,
+        e[3] and (e[3] .. ' by ' .. NAME[l]), e[4] } }, ts, a)
     arm(l, ts)
     w = w + 1
     R[#R+1] = w
@@ -628,7 +684,7 @@ assert(next(ACTIVE) == nil, "drain : actions not everywhere")
 print(string.format("== END drain waves=%d", dw))
 local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
 print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
-    STATS.forks, G.N_ACT, 100*STATS.forks//G.N_ACT, merges))
+    STATS.forks, NE, 100*STATS.forks//NE, merges))
 
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer
@@ -649,14 +705,17 @@ end
 
 local bad_o, order = same("list order")
 local norder = select(2, order:gsub("%x+", ""))
-local bad_r = 0
-for l in pairs(AUTH) do
-    bad_r = bad_r + same("reps member " .. KEYS .. "/" .. NAME[l] .. ".pub")
+-- reps: the first 10 authors (keys a1..a10), on every peer
+local bad_r, keys = 0, {}
+for k in pairs(AUTH) do keys[#keys+1] = k end
+table.sort(keys)
+for i = 1, math.min(10, #keys) do
+    bad_r = bad_r + same("reps member " .. keys[i] .. ".pub")
 end
 table.sort(R)
 print(string.format("== END actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
-    G.N_ACT, R[(#R+1)//2], R[#R], STATS.pulls,
+    NE, R[(#R+1)//2], R[#R], STATS.pulls,
     STATS.waves, STATS.wall, STATS.idle, now() - t0))
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
-    norder, bad_o, N - 1, bad_r, (function () local n = 0 for _ in pairs(AUTH) do n = n + 1 end return n end)()))
-print((bad_o == 0 and bad_r == 0 and norder == G.N_ACT) and "== PASS" or "== FAIL")
+    norder, bad_o, N - 1, bad_r, math.min(10, #keys)))
+print((bad_o == 0 and bad_r == 0 and norder == NE) and "== PASS" or "== FAIL")
