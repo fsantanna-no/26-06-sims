@@ -382,6 +382,11 @@
   hard forks and recovery cost on reconnect)
 - contrast: one super down partitions nothing (every mid has
   a second super)
+- plus one case: two neighbouring supers down (cuts the mids
+  that depend only on them)
+- metrics (eval item 14): hard forks; voided actions on merge;
+  reps changes on merge; stalled welcomes (gated); revokes
+  delayed across the cut; merge cost on reconnection
 
 # Parameters
 
