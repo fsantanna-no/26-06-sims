@@ -38,6 +38,14 @@
 - as Monero's core-periphery, Kazaa, Skype; Lemmy-like
   (instances = mids, users = leaves)
 - placement: authors UNIFORM over the 45 leaves (sticky)
+- all 45 leaves always online (decided 26/10/06): no offline
+  simulation
+    - wikimedia chat, speakers at once (log has no joins or
+      parts, so lurkers are unseen): 10 min max 18 (median 2),
+      1 h max 28 (median 3), 1 day max 48 (median 12); 677
+      speakers in all
+    - 45 leaves ~ 18 writers + ~30 silent readers at the
+      peak: not unrealistic
 - diagram: `p2p/hubs50.dia` (hubs-59; file name kept)
 
 # Loop (waves of 6 lanes, 26/10/06)
@@ -191,9 +199,52 @@
 - the paper: chat instantaneous (natural ~3%); the others
   at N tuned to 15%, a chosen stress level for async apps
 - [x] `p2p.lua`: push with timers (heap, keep), `G.T.relay`
-  replaces `G.T.sync`; drain = the pending timers
+  replaces `G.T.sync`; drain = the pending timers; `G.T.tick`
+  packs waves
+- usenet dates 2000-2007 are MODERATION BATCHES (26/10/06)
+    - every author dated US Eastern (-0400/-0500): stamped by
+      the moderator's server at release, not at posting
+    - 2000-06: 66-72% of gaps < 60 s (e.g. 2002-07-31
+      00:54:57-00:59:46 EDT, 7 msgs, 5 authors); 2007: 24%
+    - 1987-95: GMT dates, gaps < 60 s 0-9%; 2008-13: the
+      authors' own zones, 0-4%; 1996-99: missing (1 msg)
+    - gaps 2000-07 are bimodal: 75% < 2 min, then hours;
+      batches (gaps < 10, 30 or 60 min) ~2,000, size median
+      2-3, p90 15-17
+    - the mbox keeps only From/Subject/Date: real posting
+      times are lost
+    - fix (decided): spread each batch (gaps < 10 min,
+      2000-2007) evenly over the gap before it, order kept,
+      last message keeps its stamp -> 1,163 batches, 10,610
+      msgs; 2000-07 gaps < 60 s: 65% -> 0.2%, median 1 ->
+      214 min
+    - forks at N = 60 s, slices 10/30/50/70/90%: raw 2 / 7 /
+      71 / 69 / 3% -> spread 1.4 / 6.7 / 6.8 / 3.5 / 2.8%
+    - [ ] apply the spread in the usenet event stream for P2P
+      (single-peer usenet runs used raw dates)
+- corpus rule (decided 26/10/06): chat N = 0 (instant),
+  all others N = 60 s; forks are the OUTCOME per corpus (60 s:
+  adhd 15-22%, github 12-15%, wiki 10-30%, se-veg 4-26%,
+  usenet 1-7% spread); supersedes per-corpus 15% tuning
+    - posts see only pushes STRICTLY before them: same-second
+      messages fork (chat ~3%)
+- ticks (26/10/06): chain time in ticks of `T.tick` (= N/10;
+  chat 1 s); pulls due in one tick share waves, the post too
+    - exact only for one instant; error < one tick per event
+    - simple test (`p2p/logs/push-2.log`, tick 180): PASS in
+      97 s (push-1: 109 s); waves 362 -> 294, idle slots
+      1,019 -> 642 (47% -> 36%); forks 25%, 5 merges
 - [ ] per-tier N (supers fast, leaves slow): only if asked
-- [ ] recalibrate N with U(0, N) (calibrated with U(1, N))
+- [x] recalibrated with U(0, N) (26/10/06): adhd 59 s,
+  github 68 s, wiki 22 s, usenet 13 s, se-veg 3.1 min (chat
+  1.6 s, but chat stays N = 0); spread 0.5-7 min
+- [x] simple test with push (`T.relay` 1800, 3600 gaps):
+  PASS in 109 s (`p2p/logs/push-1.log`)
+    - forks 6 of 20 (30%; model 25-31%), 6 merges in DAG
+    - pulls 1,133 for 20 actions (~57 each: no wasted pulls)
+    - syncs ff 0.11-0.33 s, mg 0.32-0.44 s; posts ~0.12 s
+    - same `list order` on all 59, `reps` match (18 authors)
+    - build `261006-bug-winner`: no order divergence here
 
 # Partitions (scheduled)
 
@@ -522,8 +573,7 @@
     - [ ] if confirmed: plan in the freechains repo
 - 3. [x] sync rule: push with relay delay N (see Sync rule)
     - [x] `p2p.lua` rewritten: timers in chain time, keep
-    - [ ] simple test with push (`T.relay` 1800: ~25% forks,
-      exercises merges)
+    - [x] simple test with push: PASS (see Sync rule)
     - [ ] polling (blind) only as a contrast, if asked
 - 4. [x] corpus gaps: all six measured on this machine (see
   Sync rule)
@@ -561,3 +611,5 @@
 - `p2p/topo.py` generator: topology is fixed; other knobs
   (partitions, d) added on demand
 - real-time deadlines and time travel (no analogue here)
+- offline leaves (sessions from the data): all leaves stay
+  online; see Topology

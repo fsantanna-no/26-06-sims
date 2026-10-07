@@ -7,6 +7,8 @@
 -- Edge leaves also link to the neighbouring mid.
 -- Sibling links in fans of 4+ leaves.
 -- Sync rule: push with a relay delay (26/10/06).
+-- Chain time runs in ticks of T.tick: pulls due in one tick
+-- share waves (event times shift < T.tick).
 -- A peer that gets something new arms a timer of U(0, T.relay)
 -- chain secs (keep: a pending timer is not restarted).
 -- When it fires, every neighbour lacking something pulls from it.
@@ -461,39 +463,87 @@ local function arm (p, t)
     hpush(TIMER[p], p)
 end
 
+-------------------------------------------------------------------------------
+-- ticks: chain time is cut in ticks of G.T.tick secs; every pull
+-- due in one tick may share a wave (event times shift < tick)
+
+local PEND = {}                     -- due pulls, in order: {to, from, t}
+local TICK = nil                    -- end of the current tick
+
 --[[
--- Fire a peer's timer: every neighbour lacking something pulls
--- from it, in waves of LANES (receivers distinct, source read).
--- Each receiver gained, so it arms its own timer.
+-- Move the fires due before a chain time into PEND (as pulls).
+-- A fired peer's neighbours pull from it, in order.
 -- Inputs:
---  - p [integer]: peer
---  - t [number]: chain time of the fire
+--  - lim [number]: fires strictly before `lim`
 -- Outputs:
---  - [integer]: waves run
+--  - none
 -- Callers:
---  - advance [p2p.lua]
+--  - step [p2p.lua]
 --]]
-local function fire (p, t)
-    TIMER[p] = nil
-    local qs = {}
-    for _, q in ipairs(ADJ[p]) do
-        if useful(q, p) then qs[#qs+1] = q end
-    end
-    local waves = 0
-    for i = 1, #qs, G.LANES do
-        local tasks = {}
-        for j = i, math.min(i + G.LANES - 1, #qs) do
-            tasks[#tasks+1] = { 'pull', qs[j], p, math.floor(t) }
+local function due (lim)
+    while #HEAP > 0 and HEAP[1][1] < lim do
+        local e = hpop()
+        local t, p = e[1], e[3]
+        if TIMER[p] == t then
+            TIMER[p] = nil
+            for _, q in ipairs(ADJ[p]) do
+                PEND[#PEND+1] = { q, p, t }
+            end
         end
-        wave(tasks, math.floor(t), nil)
-        waves = waves + 1
     end
-    for _, q in ipairs(qs) do arm(q, t) end
-    return waves
 end
 
 --[[
--- Run every fire due up to a chain time, in order.
+-- Build and run one wave: `first` tasks (e.g. a post), then due
+-- pulls in order, up to LANES.
+-- A pull waits when its receiver or source is busy in the wave,
+-- or touched by an earlier waiting pull (keeps the order).
+-- A pull with nothing new is dropped.
+-- Receivers gain, so they arm their timers (at the pull's time).
+-- Inputs:
+--  - first [table]: tasks that go first (may be empty)
+--  - ts    [integer]: chain time of the wave
+--  - act   [integer]: id of a posted action (nil if no post)
+-- Outputs:
+--  - [boolean]: a wave ran
+-- Callers:
+--  - advance, main chunk [p2p.lua]
+--]]
+local function step (first, ts, act)
+    local W, R, WD, RD, tasks, rest = {}, {}, {}, {}, {}, {}
+    for _, t in ipairs(first) do
+        tasks[#tasks+1] = t
+        W[t[2]] = true
+    end
+    for i, x in ipairs(PEND) do
+        local to, from = x[1], x[2]
+        if #tasks >= G.LANES then
+            table.move(PEND, i, #PEND, #rest + 1, rest)
+            break
+        end
+        if W[to] or R[to] or WD[to] or RD[to] or W[from] or WD[from] then
+            rest[#rest+1] = x
+            WD[to], RD[from] = true, true
+        elseif useful(to, from) then
+            W[to], R[from] = true, true
+            tasks[#tasks+1] = { 'pull', to, from, math.floor(x[3]) }
+        else
+            STATS.noop = STATS.noop + 1
+        end
+    end
+    PEND = rest
+    if #tasks == 0 then
+        return false
+    end
+    wave(tasks, ts, act)
+    for _, t in ipairs(tasks) do
+        if t[1] == 'pull' then arm(t[2], t[4]) end
+    end
+    return true
+end
+
+--[[
+-- Run every pull due strictly before a chain time, tick by tick.
 -- Inputs:
 --  - upto [number]: chain time (math.huge: drain)
 -- Outputs:
@@ -503,10 +553,16 @@ end
 --]]
 local function advance (upto)
     local waves = 0
-    while #HEAP > 0 and HEAP[1][1] <= upto do
-        local e = hpop()
-        if TIMER[e[3]] == e[1] then
-            waves = waves + fire(e[3], e[1])
+    while true do
+        if #PEND == 0 then
+            if #HEAP == 0 or HEAP[1][1] >= upto then break end
+            TICK = (math.floor(HEAP[1][1] / G.T.tick) + 1) * G.T.tick
+        end
+        due(math.min(TICK, upto))
+        if #PEND == 0 then
+            -- nothing due in this tick (stale timers only)
+        elseif step({}, math.floor(PEND[1][3]), nil) then
+            waves = waves + 1
         end
     end
     return waves
@@ -535,16 +591,20 @@ for a = 1, G.N_ACT do
     local ts = G.T0 + a*G.T.action
     local ta, pa = now(), STATS.pulls
     local jf, jm = #FF + 1, #MG + 1
-    -- the pushes due before this action
+    -- the pushes due strictly before this action
     local w = advance(ts)
     -- the post: fork if the author lacks earlier actions
     local l = LEAF[math.random(#LEAF)]
     AUTH[l] = true
     local miss = lacks(l)
     if miss > 0 then STATS.forks = STATS.forks + 1 end
-    wave({ { 'post', l, ts, KEYS .. "/" .. NAME[l],
+    -- the post shares its wave with pulls due in its tick
+    TICK = (math.floor(ts / G.T.tick) + 1) * G.T.tick
+    due(TICK)
+    step({ { 'post', l, ts, KEYS .. "/" .. NAME[l],
         'simple ' .. a .. ' by ' .. NAME[l] } }, ts, a)
     arm(l, ts)
+    w = w + 1
     R[#R+1] = w
     local nf, sf = mma(FF, jf)
     local nm, sm = mma(MG, jm)

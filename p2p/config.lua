@@ -9,11 +9,14 @@ return {
     T = {
         action = 3600,      -- simple: chain secs between actions
         relay  = 1800,      -- push delay U(0, relay) secs per hop
+        tick   = 180,       -- pulls due in one tick share waves
     },
-    -- relay for ~15% forks on real gaps (2,000-gap slices, 26/10/06):
-    -- adhd 52, github 65, wiki 20, usenet 11, se-veg 192; chat 0
-    -- (instantaneous, ~3% forks: same-second messages only)
-    -- simple: 1800 over a 3600 gap forks ~25% (exercises merges)
+    -- corpus runs (decided 26/10/06): chat relay 0 (instant, tick
+    -- 1: same-second messages fork, ~3%); all others relay 60,
+    -- tick 6 (= relay / 10); forks at 60 s: adhd 15-22%, github
+    -- 12-15%, wiki 10-30%, se-veg 4-26%, usenet 1-7% (spread)
+    -- simple: relay 1800 over 3600 gaps forks 25-31% (merges);
+    -- tick = relay / 10
     LANES = 6,              -- tasks per wave, all in parallel
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 108 links and exit
