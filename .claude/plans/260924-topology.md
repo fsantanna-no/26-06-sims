@@ -358,6 +358,21 @@
               (`logs/usenet-5k-fix2-stopped.log`)
         - [ ] chat 5k, then usenet 5k, with fix 1 + fix 2
           (started 26/10/07 ~17:10)
+            - post / sync (ff pull) avg per 250 actions, fixed
+              vs unfixed tree run:
+                - 250: 0.168 / 0.34 vs 0.176 / 0.36
+                - 500: 0.198 / 0.47 vs 0.189 / 0.51
+                - 1,000: 0.189 / 0.51 vs 0.190 / 0.76
+                - 1,500: 0.203 / 0.60 vs 0.204 / 0.89
+                - 2,000: 0.205 / 0.64 vs 0.195 / 1.01
+                - 2,500: 0.197 / 0.59 vs ~0.196 / 1.09
+            - posts flat ~0.20 s; sync ~0.5-0.6 s, about half
+              the unfixed (sync ~2.4-3x a post)
+            - elapsed at 2,500: 15,394 s (unfixed ~22,500);
+              ~7.3 s per action at 2,400; forks 24 (1.0%)
+            - sweeps per peer: 18 s (500), 3 s (1,000), 23 s
+              (1,500), 27 s (2,000), 18 s (2,500); peer 1.4 ->
+              6.3 MB
         - [ ] compare with tree-trash (state as git tree), but
           it may lack the order fix of `261006-bug-winner`
 - [ ] per-tier N (supers fast, leaves slow): only if asked
@@ -387,6 +402,34 @@
 - metrics (eval item 14): hard forks; voided actions on merge;
   reps changes on merge; stalled welcomes (gated); revokes
   delayed across the cut; merge cost on reconnection
+
+# Churn: peers going on and off (26/10/07, proposed)
+
+- reverses "all leaves always online" (or a second variant:
+  to decide)
+- sources: P2P sessions and downtimes are heavy-tailed, median
+  sessions minutes to ~1 h (Stutzbach, Rejaie: Gnutella,
+  BitTorrent, Kad); fediverse servers 94-100% uptime (best
+  Mastodon 97.6%, Pleroma 99.1%); Bitcoin daily retention
+  > 90%
+- per tier (proposed, heavy-tailed draws, seeded):
+    - S: up ~14 days, down ~2 h -> ~99.4%
+    - M: up ~3 days, down ~2 h -> ~97%
+    - L: sessions median ~1 h, offline median ~8 h -> ~10-20%
+- rules:
+    - offline peers neither send nor receive (pushes skip
+      them; their timers wait)
+    - on reconnect: pull at once from online neighbours
+    - a posting author's leaf comes online, catches up, then
+      posts (no stale posts, no hard forks)
+    - no hard forks: at most one S down at a time; outages
+      capped well below `time.fork`
+    - extra links: M-M neighbours (9, 99 in all) or each M on
+      a third S: to decide
+- metrics: staleness of returning leaves; catch-up cost;
+  forks from reconnects; skipped pushes; catch-up load on mids
+- open: tier numbers ok?; M-M links or a third S?; replace or
+  variant?
 
 # Parameters
 
