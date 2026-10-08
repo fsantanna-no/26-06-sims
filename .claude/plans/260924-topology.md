@@ -413,15 +413,32 @@
   Mastodon 97.6%, Pleroma 99.1%); Bitcoin daily retention
   > 90%
 - per tier (heavy-tailed draws, seeded):
-    - S: 90% online; outages ~2 h (up ~18 h between); at most
-      2 down at once, never pentagon neighbours
+    - S: 90% online; outages ~2 h (up ~18 h between); NO
+      limit on how many are down at once (26/10/07; the
+      earlier "at most 2, never neighbours" rule dropped)
     - M: 80% online (a stress test, below measured servers);
       outages ~2 h (up ~8 h between)
     - L: sessions median ~1 h, offline median ~8 h (~10-20%
       online)
-- why S never splits the core: every M hangs on two
-  neighbouring S; two non-neighbouring S down never take both;
-  the 3 S left stay fully connected
+- backup links (26/10/07): used ONLY while the primary uplink
+  is down, and then in both directions
+    - a leaf: uplink = its own M; uses its second M only while
+      its own M is offline (that M also pushes to it)
+    - an M: uplinks = its 2 S; uses its 2 ring neighbours only
+      while BOTH its S are offline
+    - S-S always on
+    - normal operation: 73 primary links (mean path 3.6,
+      diameter 5); all 122: mean 3.0, diameter 5
+- why the core stays connected (checked offline, 26/10/07):
+    - any 2 or any 3 S down (M, L up): 10/10 and 10/10
+      combinations fully connected, via the M ring backups
+    - random S 90% (no limit) + M 80%, 20k samples: an M or S
+      cut off 0.3% of the time (a M's 2 S and both ring
+      neighbours down at once)
+    - leaves cut off only while their M(s) are down: a
+      single-homed leaf (5 odd-fan middles) 67% of the time
+      some is cut off, a dual-homed leaf 27% (L always up;
+      L are online only ~10-20%, so less in practice)
 - rules:
     - offline peers neither send nor receive (pushes skip
       them; their timers wait)
@@ -429,7 +446,8 @@
     - a posting author's leaf comes online, catches up, then
       posts (no stale posts)
     - no hard forks: outages last hours, far below
-      `time.fork` (7 days)
+      `time.fork` (7 days); cut-off leaves catch up when their
+      M returns
 - metrics: staleness of returning leaves; catch-up cost;
   forks from reconnects; skipped pushes; catch-up load on mids
 
@@ -796,10 +814,12 @@
 - next (26/10/07): churn
     - [ ] `topo.lua`: M-M ring (+9), leaf halves to left/right
       neighbour M, odd-fan middles single (122 links)
-    - [ ] redraw `hubs50.dia`
+    - [x] redraw `hubs50.dia` (26/10/07): churn links (122),
+      names S1-S5, M1-M9, leaves 01-45 (code: L01-L45, later)
     - [ ] `p2p.lua`: on/off schedule per tier (seeded), skip
       offline peers, catch-up pulls on reconnect, author's leaf
-      online + catch-up before posting
+      online + catch-up before posting; backup links only while
+      the primary uplink is down (both directions)
     - [ ] simple test with churn; then corpus runs
 
 # Won't do
