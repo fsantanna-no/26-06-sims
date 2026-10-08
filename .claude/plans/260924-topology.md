@@ -38,8 +38,8 @@
 - as Monero's core-periphery, Kazaa, Skype; Lemmy-like
   (instances = mids, users = leaves)
 - placement: authors UNIFORM over the 45 leaves (sticky)
-- all 45 leaves always online (decided 26/10/06): no offline
-  simulation
+- all 45 leaves always online (decided 26/10/06; REPLACED by
+  Churn, 26/10/07): no offline simulation
     - wikimedia chat, speakers at once (log has no joins or
       parts, so lurkers are unseen): 10 min max 18 (median 2),
       1 h max 28 (median 3), 1 day max 48 (median 12); 677
@@ -403,33 +403,52 @@
   reps changes on merge; stalled welcomes (gated); revokes
   delayed across the cut; merge cost on reconnection
 
-# Churn: peers going on and off (26/10/07, proposed)
+# Churn: peers going on and off (26/10/07, decided)
 
-- reverses "all leaves always online" (or a second variant:
-  to decide)
+- REPLACES "all leaves always online"; earlier runs stay as
+  always-online baselines
 - sources: P2P sessions and downtimes are heavy-tailed, median
   sessions minutes to ~1 h (Stutzbach, Rejaie: Gnutella,
   BitTorrent, Kad); fediverse servers 94-100% uptime (best
   Mastodon 97.6%, Pleroma 99.1%); Bitcoin daily retention
   > 90%
-- per tier (proposed, heavy-tailed draws, seeded):
-    - S: up ~14 days, down ~2 h -> ~99.4%
-    - M: up ~3 days, down ~2 h -> ~97%
-    - L: sessions median ~1 h, offline median ~8 h -> ~10-20%
+- per tier (heavy-tailed draws, seeded):
+    - S: 90% online; outages ~2 h (up ~18 h between); at most
+      2 down at once, never pentagon neighbours
+    - M: 80% online (a stress test, below measured servers);
+      outages ~2 h (up ~8 h between)
+    - L: sessions median ~1 h, offline median ~8 h (~10-20%
+      online)
+- why S never splits the core: every M hangs on two
+  neighbouring S; two non-neighbouring S down never take both;
+  the 3 S left stay fully connected
 - rules:
     - offline peers neither send nor receive (pushes skip
       them; their timers wait)
     - on reconnect: pull at once from online neighbours
     - a posting author's leaf comes online, catches up, then
-      posts (no stale posts, no hard forks)
-    - no hard forks: at most one S down at a time; outages
-      capped well below `time.fork`
-    - extra links: M-M neighbours (9, 99 in all) or each M on
-      a third S: to decide
+      posts (no stale posts)
+    - no hard forks: outages last hours, far below
+      `time.fork` (7 days)
 - metrics: staleness of returning leaves; catch-up cost;
   forks from reconnects; skipped pushes; catch-up load on mids
-- open: tier numbers ok?; M-M links or a third S?; replace or
-  variant?
+
+# Topology changes for churn (26/10/07, decided)
+
+- M-M ring: each M also links to its two angular neighbours
+  (M01 M06 M02 M07 M03 M08 M04 M09 M05, back to M01): +9 links
+- leaves: in each fan, HALF also link to the LEFT neighbour M,
+  the other half to the RIGHT one; odd fans (M01, M03, M05,
+  M07, M09): the middle leaf links only to its own M
+    - today: only the 2 edge leaves of each fan (17 cross
+      links); 28 leaves single-homed
+    - new: 40 dual-homed, 5 single-homed (middles of odd fans)
+- links: 10 S-S + 18 S-M + 9 M-M + 45 L-own M + 40 L-other M =
+  122 (was 90)
+- an M down: its dual-homed leaves fall back to the other
+  M; the middle leaf of an odd fan is cut off while it is down;
+  two neighbouring M down: their shared leaves are cut off for
+  the outage (hours)
 
 # Parameters
 
@@ -774,6 +793,15 @@
 - 10. [ ] results: `p2p/RESULTS.md` (forks by N per corpus;
   chat instantaneous)
 
+- next (26/10/07): churn
+    - [ ] `topo.lua`: M-M ring (+9), leaf halves to left/right
+      neighbour M, odd-fan middles single (122 links)
+    - [ ] redraw `hubs50.dia`
+    - [ ] `p2p.lua`: on/off schedule per tier (seeded), skip
+      offline peers, catch-up pulls on reconnect, author's leaf
+      online + catch-up before posting
+    - [ ] simple test with churn; then corpus runs
+
 # Won't do
 
 - reproducing rita-24 / tpd-21
@@ -786,6 +814,6 @@
 - `p2p/topo.py` generator: topology is fixed; other knobs
   (partitions, d) added on demand
 - real-time deadlines and time travel (no analogue here)
-- offline leaves (sessions from the data): all leaves stay
-  online; see Topology
+- offline leaves from the data's sessions (churn uses tier
+  numbers instead, see Churn)
 - sibling (leaf-leaf) links: no measurable effect under push
