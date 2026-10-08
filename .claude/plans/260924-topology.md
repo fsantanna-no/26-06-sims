@@ -468,6 +468,32 @@
   two neighbouring M down: their shared leaves are cut off for
   the outage (hours)
 
+# Asymmetric topology (26/10/07, decided: A, B, C)
+
+- A. fan sizes heavy-tailed: M1 15, M2 8, M3 6, M4 5, M5 4,
+  M6 3, M7 2, M8 1, M9 1 (45); around the ring (M1 M6 M2 M7 M3
+  M8 M4 M9 M5): 15 3 8 2 6 1 5 1 4, big and small alternate
+- B. supers per mid uneven (18 in all): M1-M3 on their 3
+  nearest S, M4-M6 on 2, M7-M9 on 1
+    - M1: S1 S2 S5; M2: S2 S3 S1; M3: S3 S4 S2; M4: S5 S4;
+      M5: S1 S5; M6: S2 S1; M7: S3; M8: S4; M9: S5
+- C. core: S ring + chords S1-S3, S1-S4 (7 links, was 10)
+- kept: M ring (backup), leaf backups half left / half right,
+  odd-fan middles single (5 single-homed, 40 dual-homed)
+- links: 7 + 18 + 9 + 45 + 40 = 119 (primary 70)
+- paths: primary only diameter 6, mean 3.40; all links
+  diameter 5, mean 2.88 (symmetric: 5 / 3.59 and 5 / 2.98)
+- checked offline (26/10/07):
+    - any 1, 2 or 3 S down (M, L up): all combinations fully
+      connected (mids on 3 S bridge the thinner core)
+    - random S 90% / M 80%: an S or M cut off 1.3% of the
+      time (symmetric: 0.3%); outages last hours: short
+      partitions, no hard forks
+- diagram: `p2p/hubs50.dia` (leaves 01-45; two rows for M1's
+  15); M3-S2 is drawn over the S2-S3 core link
+- supersedes the 1..9 fans, the even M-S wiring and the full
+  core in Topology / Topology changes for churn (122 links)
+
 # Parameters
 
 - peers: 59 (smaller counts only for smoke)
@@ -812,10 +838,10 @@
   chat instantaneous)
 
 - next (26/10/07): churn
-    - [ ] `topo.lua`: M-M ring (+9), leaf halves to left/right
-      neighbour M, odd-fan middles single (122 links)
-    - [x] redraw `hubs50.dia` (26/10/07): churn links (122),
-      names S1-S5, M1-M9, leaves 01-45 (code: L01-L45, later)
+    - [ ] `topo.lua`: asymmetric topology (A, B, C; 119
+      links), names S1-S5, M1-M9, L01-L45
+    - [x] redraw `hubs50.dia` (26/10/07): asymmetric (119
+      links), names S1-S5, M1-M9, leaves 01-45 (code: L01-L45)
     - [ ] `p2p.lua`: on/off schedule per tier (seeded), skip
       offline peers, catch-up pulls on reconnect, author's leaf
       online + catch-up before posting; backup links only while
