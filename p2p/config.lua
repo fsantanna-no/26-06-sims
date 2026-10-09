@@ -30,7 +30,7 @@ return {
     SWEEP = 500,            -- sweep all peers every SWEEP actions
                             -- (keeps peers ~5 MB, not ~200 MB loose)
     SEED  = 1,              -- random seed
-    DUMP  = false,          -- print the 90 links and exit
+    DUMP  = false,          -- print the 112 links and exit
     ALIAS = '/' .. KEY,     -- chain name
     BASE  = './.freechains-p2p-' .. KEY,   -- peers dir, wiped on start
     T0    = 1700000000,     -- simple: chain time before the first action

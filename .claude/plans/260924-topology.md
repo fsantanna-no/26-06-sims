@@ -900,8 +900,15 @@
       (1.1%), post 0.20 s, pull 0.64 s (medians)
 
 - next (26/10/07): churn
-    - [ ] `topo.lua`: asymmetric topology (A, B, C; 112
-      links), names S1-S5, M1-M9, L01-L45
+    - [x] `topo.lua`: asymmetric topology (A, B, C; 112
+      links), names S1-S5, M1-M9, L01-L45 (26/10/09)
+        - generated from asym.py: 70 primary (7 SS, 18 SM,
+          45 LM) push; 42 backup in `_bk` (9 MM, 33 LX), kept
+          in `BKUP`, unused until churn
+        - `p2p.lua`: names, BKUP, DUMP lists `MM*`/`LX*`;
+          primary graph connected (59 of 59)
+        - [ ] simple test, then chat/usenet 5k on it
+          (installed: ia-optim d995b64, tick merged)
     - [x] redraw `hubs50.dia` (26/10/07): asymmetric (112
       links, fewer leaf backups), names S1-S5, M1-M9, leaves
       01-45 (code: L01-L45)

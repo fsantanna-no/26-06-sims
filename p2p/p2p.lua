@@ -1,10 +1,10 @@
 #!/usr/bin/env lua5.4
 
--- P2P replay on hubs-59 (see `hubs50.dia`).
--- 5 supers, fully connected.
--- 9 mids M01..M09, each on its 2 nearest supers.
--- Mi carries i leaves, 45 leaves in all.
--- Edge leaves also link to the neighbouring mid.
+-- P2P replay on hubs-59, asymmetric (see `hubs50.dia`).
+-- 5 supers S1-S5: ring + chords S1-S3, S1-S4.
+-- 9 mids M1-M9: M1-M3 on 3 supers, M4-M6 on 2, M7-M9 on 1.
+-- 45 leaves L01-L45: fans 15/8/6/5/4/3/2/1/1, one mid each.
+-- Backup links (M ring, leaf second mid) wait for churn.
 -- Sync rule: push with a relay delay (26/10/06).
 -- Chain time runs in ticks of T.tick: pulls due in one tick
 -- share waves (event times shift < T.tick).
@@ -46,23 +46,23 @@ function now ()
 end
 
 -------------------------------------------------------------------------------
--- topology: hubs-59 (fixed, as drawn in hubs50.dia)
--- peer ids: S01-S05 = 0-4, M01-M09 = 5-13, leaves L14-L58 = 14-58
+-- topology: hubs-59, asymmetric (fixed, as drawn in hubs50.dia)
+-- peer ids: S1-S5 = 0-4, M1-M9 = 5-13, leaves L01-L45 = 14-58
+-- primary links carry pushes; backup links (`_bk`) are kept
+-- apart: used only while a primary uplink is down (churn)
 
 local TOPO = dofile(DIR .. "/topo.lua")
 
-
 local NS, NM, NL = TOPO._ns, TOPO._nm, TOPO._nl
 local SUP, MID, LEAF = {}, {}, {}   -- peer ids, by tier
-local NAME, TIER, HOME = {}, {}, {} -- HOME: leaf -> mid index (0-based)
-local EDGES, ADJ, MIDS = {}, {}, {} -- MIDS: leaf -> mid ids, own first
-local CROSS = {}
+local NAME, TIER = {}, {}
+local EDGES, ADJ, BKUP = {}, {}, {} -- BKUP: backup links
 
 --[[
--- Record an undirected link.
+-- Record an undirected primary link.
 -- Inputs:
 --  - a, b [integer]: peer ids
---  - kind [string]: SS | SM | LM | LX (leaf to neighbour mid) | LL
+--  - kind [string]: SS | SM | LM
 -- Outputs:
 --  - none
 -- Callers:
@@ -78,11 +78,11 @@ local N = NS + NM + NL
 for p = 0, N-1 do
     ADJ[p] = {}
     if p < NS then
-        SUP[#SUP+1] = p; NAME[p] = string.format('S%02d', p + 1); TIER[p] = 'S'
+        SUP[#SUP+1] = p; NAME[p] = 'S' .. (p + 1); TIER[p] = 'S'
     elseif p < NS + NM then
-        MID[#MID+1] = p; NAME[p] = string.format('M%02d', p - NS + 1); TIER[p] = 'M'
+        MID[#MID+1] = p; NAME[p] = 'M' .. (p - NS + 1); TIER[p] = 'M'
     else
-        LEAF[#LEAF+1] = p; NAME[p] = 'L' .. p; TIER[p] = 'L'
+        LEAF[#LEAF+1] = p; NAME[p] = string.format('L%02d', p - NS - NM + 1); TIER[p] = 'L'
     end
 end
 local ID = {}
@@ -91,26 +91,25 @@ for p = 0, N-1 do ID[NAME[p]] = p end
 for p = 0, N-1 do
     assert(TOPO[NAME[p]], "topo: missing " .. NAME[p])
     for _, x in ipairs(TOPO[NAME[p]]) do
-        local q = ID[x]
+        local q = assert(ID[x], "topo: unknown " .. x)
         local kind = TIER[p] .. TIER[q]
         if kind == 'MS' then
             kind = 'SM'
-        elseif kind == 'LM' then
-            if MIDS[p] then              -- second mid: neighbouring
-                kind = 'LX'
-                table.insert(MIDS[p], q)
-                CROSS[#CROSS+1] = { p, x }
-            else                         -- first mid: own
-                HOME[p], MIDS[p] = q - NS, { q }
-            end
         end
         link(p, q, kind)
+    end
+    for _, x in ipairs((TOPO._bk or {})[NAME[p]] or {}) do
+        local q = assert(ID[x], "topo: unknown " .. x)
+        BKUP[#BKUP+1] = { p, q, (TIER[p] == 'L') and 'LX' or 'MM' }
     end
 end
 
 if G.DUMP then
     for _, e in ipairs(EDGES) do
         print(e[3], NAME[e[1]], NAME[e[2]])
+    end
+    for _, e in ipairs(BKUP) do
+        print(e[3] .. '*', NAME[e[1]], NAME[e[2]])
     end
     os.exit(0)
 end
@@ -379,7 +378,7 @@ else
 end
 
 -------------------------------------------------------------------------------
--- setup: S01 inits, the others clone from an already created
+-- setup: S1 inits, the others clone from an already created
 -- neighbour (BFS order, one BFS layer per parallel step)
 
 os.execute("rm -rf " .. G.BASE)
