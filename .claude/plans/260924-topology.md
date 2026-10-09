@@ -907,8 +907,15 @@
           in `BKUP`, unused until churn
         - `p2p.lua`: names, BKUP, DUMP lists `MM*`/`LX*`;
           primary graph connected (59 of 59)
-        - [ ] simple test, then chat/usenet 5k on it
-          (installed: ia-optim d995b64, tick merged)
+        - [x] simple test: PASS, 45% forks (old topo 25-31%:
+          diameter 6 vs 5)
+        - [x] chat 5k relay 0: stopped at 1284 (26/10/09),
+          same as old topology (forks 15 at 1280, both; time
+          per 500 within 4%); log `chat-5k-asym-r0-stopped.log`
+        - relay as U(min, max) (26/10/09): chat 1-2 s
+          (latency), usenet 1-60 s; tick = max(1, max // 10)
+        - [ ] chat 5k 1-2 s, then usenet 5k 1-60 s (running;
+          installed: ia-optim d995b64, tick merged)
     - [x] redraw `hubs50.dia` (26/10/07): asymmetric (112
       links, fewer leaf backups), names S1-S5, M1-M9, leaves
       01-45 (code: L01-L45)

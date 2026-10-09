@@ -8,10 +8,10 @@
 -- Sync rule: push with a relay delay (26/10/06).
 -- Chain time runs in ticks of T.tick: pulls due in one tick
 -- share waves (event times shift < T.tick).
--- A peer that gets something new arms a timer of U(0, T.relay)
+-- A peer that gets something new arms a timer of U(T.relay)
 -- chain secs (keep: a pending timer is not restarted).
 -- When it fires, every neighbour lacking something pulls from it.
--- T.relay = 0: instantaneous (chat).
+-- T.relay = {min, max} secs; {0, 0}: instantaneous.
 -- Fork: the author lacks an earlier action when it posts.
 -- Work runs in waves of LANES tasks, all in parallel.
 -- In a wave, writers are distinct, and no writer is a source.
@@ -513,7 +513,8 @@ local function arm (p, t)
     if TIMER[p] then
         return
     end
-    TIMER[p] = t + math.random() * G.T.relay
+    local lo, hi = G.T.relay[1], G.T.relay[2]
+    TIMER[p] = t + lo + math.random() * (hi - lo)
     hpush(TIMER[p], p)
 end
 
@@ -725,7 +726,7 @@ print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
 -- at chain time (last action + relay): the wall clock would fold
 -- years of daily slots (slow, every member capped)
 
-local TEND = EVENTS[NE][1] + G.T.relay
+local TEND = EVENTS[NE][1] + G.T.relay[2]
 
 local function same (cmd)
     local ref, bad = nil, 0
