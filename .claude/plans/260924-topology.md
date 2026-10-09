@@ -218,6 +218,13 @@
       last message keeps its stamp -> 1,163 batches, 10,610
       msgs; 2000-07 gaps < 60 s: 65% -> 0.2%, median 1 ->
       214 min
+    - extended to all years (26/10/08): usenet 5k forks
+      jumped at 1989-90 (2 -> 120 at 500-1000), runs of
+      authors ~1 min apart; comp.compilers is moderated
+      throughout -> 1,921 batches, 12,588 msgs; first 5k
+      gaps <= 60 s: 158 -> 0, <= 5 min: 409 -> 6
+        - `data/usenet.tsv` replaced after the running
+          usenet 5k (raw pre-2000 batches baseline)
     - forks at N = 60 s, slices 10/30/50/70/90%: raw 2 / 7 /
       71 / 69 / 3% -> spread 1.4 / 6.7 / 6.8 / 3.5 / 2.8%
     - [ ] apply the spread in the usenet event stream for P2P
@@ -845,6 +852,30 @@
   days; hard forks counted, not aborted
 - 10. [ ] results: `p2p/RESULTS.md` (forks by N per corpus;
   chat instantaneous)
+
+- next (26/10/08): optim and new topology
+    - [ ] new sync optim build: post and sync time against
+      the current chat 5k run (fix 2 + fix 1)
+    - [ ] decide which freechains build to keep
+    - [ ] rerun the runs on the asymmetric topology (needs
+      `topo.lua`)
+    - [x] END check `reps` at chain time (`--now` = last
+      action + relay): wall clock took 22 s per call (590
+      calls, ~3.4 h), folding 16 years of daily slots
+      (4,295 of 5,000 chat posts still queued)
+    - [ ] tick build (freechains 26/10/08, tree-trash port):
+      global chain clock replaces the per-member settle queue
+        - rerun chat 5k: reps no longer queue (4,295 of 5,000
+          before), far `--now` cheap
+        - install only after usenet 5k ends
+    - [ ] usenet: regenerate `data/usenet.tsv` (batch spread
+      all years) after the running 5k; rerun usenet 5k
+    - [x] usenet 5k (fix 2 + fix 1, pre-2000 batches raw):
+      PASS, 53,063 s, forks 174 (3.5%, mostly 1989-90
+      batches), post 0.19 s, pull 0.67 s (medians); END
+      check 91 s (short reps queues)
+    - [x] chat 5k (fix 2 + fix 1): PASS, 51,585 s, forks 57
+      (1.1%), post 0.20 s, pull 0.64 s (medians)
 
 - next (26/10/07): churn
     - [ ] `topo.lua`: asymmetric topology (A, B, C; 112

@@ -723,12 +723,16 @@ print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
 
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer
+-- at chain time (last action + relay): the wall clock would fold
+-- years of daily slots (slow, every member capped)
+
+local TEND = EVENTS[NE][1] + G.T.relay
 
 local function same (cmd)
     local ref, bad = nil, 0
     for p = 0, N-1 do
-        local out = exec("freechains --root=" .. root(p) .. " chain '" ..
-            G.ALIAS .. "' " .. cmd)
+        local out = exec("freechains --root=" .. root(p) .. " --now=" ..
+            TEND .. " chain '" .. G.ALIAS .. "' " .. cmd)
         if ref == nil then
             ref = out
         elseif out ~= ref then

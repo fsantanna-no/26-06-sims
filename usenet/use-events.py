@@ -12,10 +12,11 @@ Times (UTC, seconds):
   - full dates: parsed with their zone (email.utils)
   - date-only (`YYYY/MM/DD`, ~10k records, 1995-2000): spread
     evenly over their day, in archive order
-  - 2000-2007 dates are stamped at moderation release (US
-    Eastern for every author): each batch (gaps < BATCH secs)
-    is spread evenly over the gap before it, order kept, its
-    last message keeps its stamp
+  - dates are stamped at moderation release (2000-2007: US
+    Eastern for every author; 1989-1999: runs ~1 min apart):
+    each batch (gaps < BATCH secs) is spread evenly over the
+    gap before it, order kept, its last message keeps its
+    stamp
 usage: use-events.py [mbox] [out-prefix]
 """
 
@@ -27,8 +28,6 @@ import re
 import sys
 
 BATCH = 600                                         # secs within a batch
-A = calendar.timegm((2000, 1, 1, 0, 0, 0))          # moderation stamps
-B = calendar.timegm((2008, 1, 1, 0, 0, 0))
 SEP = re.compile(r'^From -?\d+$')
 
 
@@ -112,12 +111,12 @@ def main ():
         for k, e in enumerate(es):
             e[0] = day + (k + 0.5) * 86400 / len(es)
     ev.sort(key=lambda e: (e[0], e[1]))
-    # moderation batches 2000-2007: spread over the gap before each
+    # moderation batches (all years): spread over the gap before each
     ts = [e[0] for e in ev]
     new, i, nb, nm = [], 0, 0, 0
     while i < len(ts):
         j = i
-        while j + 1 < len(ts) and A <= ts[j] < B and ts[j+1] - ts[j] < BATCH:
+        while j + 1 < len(ts) and ts[j+1] - ts[j] < BATCH:
             j += 1
         k = j - i + 1
         if k > 1 and new:
