@@ -868,6 +868,28 @@
         - rerun chat 5k: reps no longer queue (4,295 of 5,000
           before), far `--now` cheap
         - install only after usenet 5k ends
+        - [x] chat 5k tick: PASS, 23,210 s (old 51,585 s),
+          forks 57 (same), post 0.09 s (old 0.20), pull 0.36 s
+          (old 0.64), max pull 0.91 s (old 3.30), peer 11 MB
+          (old 13), END check 30 s (old ~3.4 h)
+            - kept S01/L58: same head a2a5a727, 5058 commits,
+              57 merges; reps a1 24000, a2 18000 on both
+            - `reps` at wall clock: 0.03 s (old 22 s)
+        - [x] usenet 5k tick (batch spread all years): PASS,
+          36,454 s (old 53,063 s), forks 0 (old 174), post
+          0.09 s (old 0.19), pull 0.45 s (old 0.67), max pull
+          1.84 s (old 3.63), peer 20 MB (old 22), sweep 51 s
+          (old 56; slower mid-run)
+            - kept S01/L58: same head a248adb1e, 5001 commits,
+              0 merges, 5000 in order; reps a1 50000, a2 2000
+        - speedup shrinks with chain size (1.9x -> 1.3x per
+          500): pull cost still grows ~0.03 s per 500 actions
+        - done (26/10/09 15:24): chat 5k then usenet 5k
+          (new `usenet.tsv`); old logs `*-5k-fix12.log`
+        - evidence: two peers (p00 = S01, p58 = L58) kept in
+          `p2p/.freechains-keep/<corpus>-<build>/` (+ keys);
+          usenet-fix12 kept; chat-fix12 already wiped;
+          chat-tick, usenet-tick copied at each PASS/FAIL
     - [ ] usenet: regenerate `data/usenet.tsv` (batch spread
       all years) after the running 5k; rerun usenet 5k
     - [x] usenet 5k (fix 2 + fix 1, pre-2000 batches raw):
