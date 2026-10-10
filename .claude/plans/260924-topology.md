@@ -914,8 +914,37 @@
           per 500 within 4%); log `chat-5k-asym-r0-stopped.log`
         - relay as U(min, max) (26/10/09): chat 1-2 s
           (latency), usenet 1-60 s; tick = max(1, max // 10)
-        - [ ] chat 5k 1-2 s, then usenet 5k 1-60 s (running;
-          installed: ia-optim d995b64, tick merged)
+        - chat 5k 1-2 s: stopped at 578 for a 2k limit;
+          at 500: forks 6.4% (relay 0: 1.2%), merges 44,
+          waves/act 12.6 (11.9), pulls/act 55 (57)
+        - [x] chat 2k 1-5 s: PASS, 7,553 s (relay 0: 6,677 s
+          at 2k, +13%), forks 480 (24%), merges in DAG 492,
+          merge pulls 589 (0.43 s), drain 26 waves (11),
+          pulls/act 51 (58), peer 4.4 MB (4.0); kept S1/L45:
+          head cd04ec18, 2493 commits, 492 merges
+        - [ ] chat 2k 1-2 s: killed at 1992 (26/10/10, low
+          memory: browser ~6 GB); at 1500: forks 139 (9.3%),
+          merges 171 (0.38 s), +9% time vs relay 0; no END;
+          log `chat-2k-r12-killed-1992.log`; rerun
+        - [x] chat 2k 1-2 s rerun: PASS, 7,135 s (+6% vs
+          relay 0), forks 198 (9.9%), merges in DAG 199, merge
+          pulls 237 (0.39 s), drain 23 waves, pulls/act 56;
+          same numbers as the killed run (seeded); kept S1/L45:
+          head 29b31e67, 2200 commits, 199 merges
+        - fork curve, chat 2k: relay 0 1.1%, 1-2 s 9.9%, 1-5 s
+          24.0%; time +0 / +6 / +13%
+        - [x] usenet 5k 1-60 s: PASS, 34,900 s (old topo
+          0-60 s: 36,454 s, -4%), forks 0 (same), post 0.08 s,
+          pull 0.42 s (0.45), max pull 1.12 s (1.84), drain 15
+          waves (18), peer 19 MB (20); kept S1/L45: head
+          fb89d58c5, 5001 commits, 0 merges
+        - asymmetric topology: no cost vs old at these rates;
+          its effect is in forks under delay (simple 45% vs
+          25-31%)
+        - (was) running (26/10/09 20:05): chat 2k 1-2 s, chat 2k
+          1-5 s, usenet 5k 1-60 s; logs `chat-2k-r12`,
+          `chat-2k-r15`, `usenet-5k-r160`; peers kept per run
+          (installed: ia-optim d995b64, tick merged)
     - [x] redraw `hubs50.dia` (26/10/07): asymmetric (112
       links, fewer leaf backups), names S1-S5, M1-M9, leaves
       01-45 (code: L01-L45)

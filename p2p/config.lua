@@ -2,7 +2,7 @@
 -- Loaded by p2p.lua as G.
 
 local MODE   = 'corpus'     -- simple | corpus
-local CORPUS = 'chat'       -- corpus: chat | usenet (posts only)
+local CORPUS = 'usenet'     -- corpus: chat | usenet (posts only)
 
 -- relay secs per hop (push), U(min, max): decided 26/10/09:
 -- chat 1-2 (latency), usenet 1-60; simple: 0-1800 over 3600
