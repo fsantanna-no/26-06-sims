@@ -973,6 +973,10 @@
               sessions share waves (lanes)
             - [ ] rerun usenet 5k local first with `SLOT`
               (26/10/11): @10 26 s (was 73 s)
+                - git-batch build (031c070) installed 10:12, at
+                  ~action 400: same results, pulls 10-30% faster
+                - @500: 2953 s (was 6258 s, 2.1x); 58% forks;
+                  2.06 pulls/wave (was 1.03)
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)
