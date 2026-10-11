@@ -546,6 +546,9 @@ for p = 0, N-1 do
     local k = (TIER[p] == 'M') and 'SM' or ((TIER[p] == 'L') and 'LM')
     if k and (SYNC[k] or 0) > 0 then
         PHASE[p] = math.random() * SYNC[k]
+        if (G.SLOT or 0) > 0 then   -- whole slots: shared dial-ins
+            PHASE[p] = math.floor(PHASE[p] / G.SLOT) * G.SLOT
+        end
     end
 end
 

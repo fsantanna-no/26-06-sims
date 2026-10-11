@@ -961,6 +961,18 @@
               installed 26/10/11 00:22
             - [ ] rerun usenet 5k local first (running since
               26/10/11): log `usenet-5k-lf`
+                - @1000: fix holds; max pull 3.9 s (was 21 s
+                  @840); 72% forks; 8836 s per 500 (growing)
+                - @1500: 80% forks, 1930 merges; max pull 4.0 s;
+                  10811 s per 500; ff median 0.57 s
+                - stopped @1885 (log `-backs-stopped-1885`):
+                  1 pull per wave (random phases), pulls 1-2 s
+                  (~60% git process start-ups, freechains plan
+                  ia-optim `261011-git-batch`)
+            - [x] `SLOT` (config): phases on whole hours, so
+              sessions share waves (lanes)
+            - [ ] rerun usenet 5k local first with `SLOT`
+              (26/10/11): @10 26 s (was 73 s)
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)

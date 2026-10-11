@@ -32,6 +32,9 @@ return {
     -- kind, 0 = always on; UUCP-like: mids dial the supers every
     -- 6 h, leaves dial their mid every 24 h (seeded phases)
     SYNC  = { SS = 0, SM = 6*3600, LM = 24*3600 },
+    -- session phases on whole SLOT secs (shared dial-in times,
+    -- so pulls share waves); 0 = any time
+    SLOT  = 3600,
     SWEEP = 500,            -- sweep all peers every SWEEP actions
                             -- (keeps peers ~5 MB, not ~200 MB loose)
     SEED  = 1,              -- random seed
