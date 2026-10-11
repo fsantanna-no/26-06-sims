@@ -957,7 +957,10 @@
             - fix (checked on a patched copy): mark every
               visited node; pull 115 s -> 2.75 s; same head,
               order, refs, reps
-            - [ ] fix upstream (freechains), then rerun
+            - [x] fix upstream (freechains, plan 261010-backs),
+              installed 26/10/11 00:22
+            - [ ] rerun usenet 5k local first (running since
+              26/10/11): log `usenet-5k-lf`
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)
