@@ -5,6 +5,9 @@
 -- 9 mids M1-M9: M1-M3 on 3 supers, M4-M6 on 2, M7-M9 on 1.
 -- 45 leaves L01-L45: fans 15/8/6/5/4/3/2/1/1, one mid each.
 -- Backup links (M ring, leaf second mid) wait for churn.
+-- Local first (G.SYNC): a scheduled link (SM, LM) only carries
+-- pulls at its sessions (period per kind, seeded phase per mid /
+-- leaf); authors post on their leaf anytime.
 -- Sync rule: push with a relay delay (26/10/06).
 -- Chain time runs in ticks of T.tick: pulls due in one tick
 -- share waves (event times shift < T.tick).
@@ -57,6 +60,7 @@ local NS, NM, NL = TOPO._ns, TOPO._nm, TOPO._nl
 local SUP, MID, LEAF = {}, {}, {}   -- peer ids, by tier
 local NAME, TIER = {}, {}
 local EDGES, ADJ, BKUP = {}, {}, {} -- BKUP: backup links
+local KIND = {}                     -- KIND[a][b]: SS | SM | LM
 
 --[[
 -- Record an undirected primary link.
@@ -70,6 +74,9 @@ local EDGES, ADJ, BKUP = {}, {}, {} -- BKUP: backup links
 --]]
 local function link (a, b, kind)
     EDGES[#EDGES+1] = { a, b, kind }
+    KIND[a] = KIND[a] or {}
+    KIND[b] = KIND[b] or {}
+    KIND[a][b], KIND[b][a] = kind, kind
     ADJ[a][#ADJ[a]+1] = b
     ADJ[b][#ADJ[b]+1] = a
 end
@@ -257,6 +264,8 @@ end
 
 local STATS = { pulls=0, idle=0, waves=0, wall=0, forks=0, noop=0 }
 local POST, FF, MG = {}, {}, {}     -- times (s), in order
+local BORN, VIS = {}, {}            -- post chain time; secs to everywhere
+local TMAX = 0                      -- latest wave chain time
 
 --[[
 -- Run one wave: the tasks, one per lane, in parallel.
@@ -308,6 +317,7 @@ local function wave (tasks, ts, act)
             end
             POST[#POST+1] = tonumber(ns) / 1e9
             HOLD[act], CNT[act], ACTIVE[act] = { [to] = true }, 1, true
+            BORN[act] = ts
         else
             if rc ~= '0' then
                 error(string.format("wave : pull %s <- %s : rc=%s %s",
@@ -323,9 +333,11 @@ local function wave (tasks, ts, act)
             end
         end
     end
+    TMAX = math.max(TMAX, ts)
     for a in pairs(ACTIVE) do
         if CNT[a] == N then
             ACTIVE[a], HOLD[a] = nil, nil
+            VIS[#VIS+1] = ts - BORN[a]
         end
     end
     return #tasks
@@ -448,16 +460,17 @@ local HEAP, TIMER = {}, {}          -- pending fires; peer -> fire time
 -- Push a fire onto the heap (min by time, then by insertion).
 -- Inputs:
 --  - t [number]: chain time of the fire
---  - p [integer]: peer
+--  - p [integer]: peer (source)
+--  - q [integer|nil]: receiver of a deferred pull (session)
 -- Outputs:
 --  - none
 -- Callers:
---  - arm [p2p.lua]
+--  - arm, due [p2p.lua]
 --]]
 local SEQ = 0
-local function hpush (t, p)
+local function hpush (t, p, q)
     SEQ = SEQ + 1
-    local e, i = { t, SEQ, p }, #HEAP + 1
+    local e, i = { t, SEQ, p, q }, #HEAP + 1
     HEAP[i] = e
     while i > 1 do
         local j = i // 2
@@ -525,9 +538,43 @@ end
 local PEND = {}                     -- due pulls, in order: {to, from, t}
 local TICK = nil                    -- end of the current tick
 
+-- local first: session phases (drawn only when G.SYNC is on, so
+-- runs without it keep their random sequence)
+local SYNC = G.SYNC or {}
+local PHASE, SCHED = {}, {}         -- owner -> phase; "p:q" -> pending
+for p = 0, N-1 do
+    local k = (TIER[p] == 'M') and 'SM' or ((TIER[p] == 'L') and 'LM')
+    if k and (SYNC[k] or 0) > 0 then
+        PHASE[p] = math.random() * SYNC[k]
+    end
+end
+
+--[[
+-- Next session of a scheduled link at or after a chain time.
+-- The lower-tier peer owns the link (mid: SM, leaf: LM).
+-- Inputs:
+--  - p, q [integer]: the link ends
+--  - t    [number]: chain time
+-- Outputs:
+--  - [number|nil]: session time, nil if the link is always on
+-- Callers:
+--  - due [p2p.lua]
+--]]
+local function session (p, q, t)
+    local k = KIND[p][q]
+    local per = SYNC[k] or 0
+    if per <= 0 then
+        return nil
+    end
+    local o = (TIER[p] == 'L' or (TIER[p] == 'M' and k == 'SM')) and p or q
+    local ph = PHASE[o]
+    return ph + math.ceil((t - ph) / per) * per
+end
+
 --[[
 -- Move the fires due before a chain time into PEND (as pulls).
--- A fired peer's neighbours pull from it, in order.
+-- A fired peer's neighbours pull from it, in order; over a
+-- scheduled link the pull waits for the link's next session.
 -- Inputs:
 --  - lim [number]: fires strictly before `lim`
 -- Outputs:
@@ -538,11 +585,20 @@ local TICK = nil                    -- end of the current tick
 local function due (lim)
     while #HEAP > 0 and HEAP[1][1] < lim do
         local e = hpop()
-        local t, p = e[1], e[3]
-        if TIMER[p] == t then
+        local t, p, r = e[1], e[3], e[4]
+        if r then                       -- session: deferred pull
+            SCHED[p .. ':' .. r] = nil
+            PEND[#PEND+1] = { r, p, t }
+        elseif TIMER[p] == t then
             TIMER[p] = nil
             for _, q in ipairs(ADJ[p]) do
-                PEND[#PEND+1] = { q, p, t }
+                local s = session(p, q, t)
+                if not s then
+                    PEND[#PEND+1] = { q, p, t }
+                elseif not SCHED[p .. ':' .. q] then
+                    SCHED[p .. ':' .. q] = true
+                    hpush(s, p, q)
+                end
             end
         end
     end
@@ -720,13 +776,16 @@ print(string.format("== END drain waves=%d", dw))
 local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
 print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
     STATS.forks, NE, 100*STATS.forks//NE, merges))
+table.sort(VIS)
+print(string.format("== END visibility (post -> all peers) secs: median=%.0f p90=%.0f max=%.0f",
+    VIS[(#VIS + 1) // 2] or 0, VIS[math.ceil(#VIS * 0.9)] or 0, VIS[#VIS] or 0))
 
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer
 -- at chain time (last action + relay): the wall clock would fold
 -- years of daily slots (slow, every member capped)
 
-local TEND = EVENTS[NE][1] + G.T.relay[2]
+local TEND = math.ceil(math.max(EVENTS[NE][1] + G.T.relay[2], TMAX))
 
 local function same (cmd)
     local ref, bad = nil, 0

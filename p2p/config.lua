@@ -28,6 +28,10 @@ return {
     -- simple: relay 1800 over 3600 gaps forks 25-31% (merges);
     -- tick = relay / 10
     LANES = 6,              -- tasks per wave, all in parallel
+    -- local first (26/10/10): session period (secs) per link
+    -- kind, 0 = always on; UUCP-like: mids dial the supers every
+    -- 6 h, leaves dial their mid every 24 h (seeded phases)
+    SYNC  = { SS = 0, SM = 0, LM = 0 },
     SWEEP = 500,            -- sweep all peers every SWEEP actions
                             -- (keeps peers ~5 MB, not ~200 MB loose)
     SEED  = 1,              -- random seed

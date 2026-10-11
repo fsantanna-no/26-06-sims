@@ -938,6 +938,26 @@
           pull 0.42 s (0.45), max pull 1.12 s (1.84), drain 15
           waves (18), peer 19 MB (20); kept S1/L45: head
           fb89d58c5, 5001 commits, 0 merges
+        - [ ] local first (26/10/10): open chain (no reps
+          budget); `G.SYNC` per link kind: SM 6 h, LM 24 h,
+          SS always; seeded phases per mid/leaf; posts on the
+          leaf anytime; deferred pulls at sessions; new END
+          metric: visibility (post -> all peers)
+            - simple: off = old (9 forks, PASS); on: 19/20
+              forks, visibility median 44 h, max 54 h, PASS
+            - usenet 5k stopped at 843 (26/10/10): pulls grew
+              0.5 s -> 35 s (merges 103 s) after ~800; forks
+              68%; DAG 1540 commits, 699 merges; log
+              `usenet-5k-lf-stopped-843.log`
+            - profile (one pull, 852 s under hooks): git 2 s;
+              `ACTION.backs` (action.lua:188) 848 s, inner
+              `rec` 24.7M calls / 39 calls: visited set only
+              marks actions, so sync merges are re-walked per
+              path (exponential in merge depth)
+            - fix (checked on a patched copy): mark every
+              visited node; pull 115 s -> 2.75 s; same head,
+              order, refs, reps
+            - [ ] fix upstream (freechains), then rerun
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)
