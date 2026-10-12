@@ -971,8 +971,10 @@
                   ia-optim `261011-git-batch`)
             - [x] `SLOT` (config): phases on whole hours, so
               sessions share waves (lanes)
-            - [ ] rerun usenet 5k local first with `SLOT`
-              (26/10/11): @10 26 s (was 73 s)
+            - [x] rerun usenet 5k local first with `SLOT`
+              (26/10/11 09:00 - 22:40): PASS; log
+              `usenet-5k-lf-slot`, kept S1/L45 (72 MB)
+              @10 26 s (was 73 s)
                 - git-batch build (031c070) installed 10:12, at
                   ~action 400: same results, pulls 10-30% faster
                 - @500: 2953 s (was 6258 s, 2.1x); 58% forks;
@@ -1010,6 +1012,13 @@
                   forks; 7474 merges; work ~84.3k s (always-on
                   ~102.1k, -17%); par 2.06; 5222 s per 500
                   (always-on 5000); peer 22 MB (17)
+                - END: PASS (0 of 58 peers differ, 0 reps
+                  mismatches); 46915 s (always-on 34900 s,
+                  1.34x); 91% forks; 6492 merges in DAG; work
+                  ~97.0k s (always-on ~122.2k, -21%); par 2.07
+                  (3.50); peer 24 MB (19); visibility median
+                  43.5 h, p90 51.7 h, max 58 h
+                - fix: run-lf.sh restore sed (`*` in pattern)
             - [x] report line: `work` (summed post + pull times)
               and `par` (work / elapsed); next runs only
         - asymmetric topology: no cost vs old at these rates;
