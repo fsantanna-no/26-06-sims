@@ -1019,6 +1019,17 @@
                   (3.50); peer 24 MB (19); visibility median
                   43.5 h, p90 51.7 h, max 58 h
                 - fix: run-lf.sh restore sed (`*` in pattern)
+            - evidence, post hoc on kept S1/L45 copies (scratch
+              `ev/`; keep dirs untouched):
+                - same `list order` on S1 and L45 (md5 d30f3a6c)
+                - declared times = corpus times (5000)
+                - clamps (P_i > S_i): 2738 of 5000 (54.8%); P-S
+                  median 11.6 h, p90 29.5 h, max 51.5 h; 523 >
+                  24 h, 3 > 48 h, 0 > 7 d; always-on r160: 0
+                - reorders per merge (`ev/reorders.py`): order at
+                  M vs each parent, moved = outside the common
+                  prefix; only merges with snapshots at M, p1, p2
+                  (2198 of 5972 on S1); running
             - [x] report line: `work` (summed post + pull times)
               and `par` (work / elapsed); next runs only
         - asymmetric topology: no cost vs old at these rates;
