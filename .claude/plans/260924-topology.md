@@ -1026,10 +1026,18 @@
                 - clamps (P_i > S_i): 2738 of 5000 (54.8%); P-S
                   median 11.6 h, p90 29.5 h, max 51.5 h; 523 >
                   24 h, 3 > 48 h, 0 > 7 d; always-on r160: 0
-                - reorders per merge (`ev/reorders.py`): order at
+                - all queries: `p2p/ev/ev.sh <run> <now>`
+                - reorders per merge (`p2p/ev/reorders.py`): order at
                   M vs each parent, moved = outside the common
                   prefix; only merges with snapshots at M, p1, p2
-                  (2198 of 5972 on S1); running
+                  (2198 of 5972 on S1; 1460 of 6492 on L45)
+                    - parent 1 never moves (winner first); the
+                      loser moves in 99.3% of merges
+                    - moved per merge: mean 3.4, median 2, p90 8,
+                      max 21 (same on S1 and L45)
+                    - 29% of merges also reorder inside the loser
+                      (nested forks re-sorted)
+                    - bias: only merges with stored snapshots
             - [x] report line: `work` (summed post + pull times)
               and `par` (work / elapsed); next runs only
         - asymmetric topology: no cost vs old at these rates;
