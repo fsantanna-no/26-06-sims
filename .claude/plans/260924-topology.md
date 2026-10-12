@@ -977,6 +977,41 @@
                   ~action 400: same results, pulls 10-30% faster
                 - @500: 2953 s (was 6258 s, 2.1x); 58% forks;
                   2.06 pulls/wave (was 1.03)
+                - vs always-on @500 (1.7x): sim, not freechains;
+                  pull work ~5.6k s vs ~5.8k s, run at once 1.9
+                  vs 3.2
+                - @1000: 6802 s (was 15094 s, 2.2x); 71% forks;
+                  work ~13.3k s (always-on ~12.8k), par 1.95
+                  (always-on 3.27, no slots 1.0)
+                - @1500: 11443 s (was 25905 s, 2.3x); 79% forks;
+                  work ~22.6k s (always-on ~21.0k), par 1.97;
+                  ff avg 0.49 s, max 7.0 s (growing)
+                - @2000: 15723 s (always-on 9124 s, 1.7x); 82%
+                  forks; 2883 merges; work ~31.2k s (always-on
+                  ~30.3k), par 1.99; 4280 s per 500 (was 4641);
+                  max pull still 7.0 s; peer 8.7 MB (7.1)
+                - @2500: 20490 s (always-on 12263 s, 1.7x); 85%
+                  forks; 3780 merges; work ~41.2k s (always-on
+                  ~40.8k), par 2.01; 4767 s per 500; peer 12 MB
+                  (9.0)
+                - @3000: 25168 s (always-on 15814 s, 1.6x); 87%
+                  forks; 4670 merges; work ~51.0k s (always-on
+                  ~52.4k, now lower); par 2.02; 4678 s per 500
+                  (always-on 3551); peer 14 MB (11)
+                - @3500: 30439 s (always-on 19805 s, 1.5x); 88%
+                  forks; 5606 merges; work ~62.1k s (always-on
+                  ~67.3k, -8%); par 2.04; 5271 s per 500
+                  (always-on 3991); peer 17 MB (13)
+                - @4000: 35643 s (always-on 24372 s, 1.46x); 90%
+                  forks; 6542 merges; work ~72.9k s (always-on
+                  ~83.8k, -13%); par 2.05; 5204 s per 500
+                  (always-on 4567); peer 19 MB (15)
+                - @4500: 40865 s (always-on 29372 s, 1.39x); 90%
+                  forks; 7474 merges; work ~84.3k s (always-on
+                  ~102.1k, -17%); par 2.06; 5222 s per 500
+                  (always-on 5000); peer 22 MB (17)
+            - [x] report line: `work` (summed post + pull times)
+              and `par` (work / elapsed); next runs only
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)

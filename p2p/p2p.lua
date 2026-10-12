@@ -368,6 +368,23 @@ local function mma (xs, i0)
     return n, string.format("%.2f/%.2f/%.2f", lo, s/n, hi)
 end
 
+--[[
+-- Sum of a list of times.
+-- Inputs:
+--  - xs [table]: times (s)
+-- Outputs:
+--  - [number]: the sum (s)
+-- Callers:
+--  - main chunk [p2p.lua]: the "work" of a report
+--]]
+local function sum (xs)
+    local s = 0
+    for _, x in ipairs(xs) do
+        s = s + x
+    end
+    return s
+end
+
 -------------------------------------------------------------------------------
 -- events: { ts, user, msg | nil, file | nil } in time order
 --  - simple: N_ACT artificial posts, T.action apart, by leaves
@@ -765,9 +782,14 @@ for a, e in ipairs(EVENTS) do
         local nf, sf = mma(FF, 1)
         local nm, sm = mma(MG, 1)
         print()
-        print(string.format("== %d %4ds  forks=%d (%d%%)  post=%s  pulls=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d",
-            a, math.floor(now() - t0), STATS.forks, 100*STATS.forks//a,
-            sp, STATS.pulls, nf, sf, nm, sm, STATS.idle))
+        -- work: summed post + pull times (all lanes); par: work
+        -- over elapsed (how many ran at once)
+        local el = now() - t0
+        local wk = sum(POST) + sum(FF) + sum(MG)
+        print(string.format("== %d %4ds  forks=%d (%d%%)  post=%s  pulls=%d  ff[%4d]=%s  mg[%4d]=%s  idle=%d  work=%ds  par=%.1f",
+            a, math.floor(el), STATS.forks, 100*STATS.forks//a,
+            sp, STATS.pulls, nf, sf, nm, sm, STATS.idle,
+            math.floor(wk), wk / el))
         print()
     end
 end
