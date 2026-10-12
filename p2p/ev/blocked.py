@@ -41,6 +41,8 @@ for k in os.listdir(keys):
 
 # posts by declared time; first post per author = welcome
 head = git("rev-parse", "HEAD").strip()
+import atexit
+atexit.register(lambda: git("update-ref", "refs/heads/main", head))
 acts = [l.split() for l in git("log", "--no-merges", "--reverse", "--format=%H %at %P", "HEAD").splitlines()]
 acts = [a for a in acts if a[0] in member]
 acts.sort(key=lambda a: (int(a[1]), a[0]))
