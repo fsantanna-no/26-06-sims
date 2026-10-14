@@ -14,7 +14,7 @@ local RL    = RELAY[KEY]
 return {
     MODE  = MODE,
     SRC   = '../data/' .. CORPUS,  -- corpus: TSV + bodies (from p2p/)
-    LIMIT = 5000,           -- corpus: first LIMIT events
+    LIMIT = 33814,          -- corpus: first LIMIT events (usenet: all)
     N_ACT = 20,             -- simple: number of actions
     T = {
         action = 3600,      -- simple: chain secs between actions
@@ -37,6 +37,12 @@ return {
     SLOT  = 3600,
     SWEEP = 500,            -- sweep all peers every SWEEP actions
                             -- (keeps peers ~5 MB, not ~200 MB loose)
+    -- kept copies (S1, L45, keys) of a run, while it runs: env
+    -- KEEP=<run> copies every KEEP_N actions to .freechains-keep/
+    -- <run>-<a>; ev/ev.sh runs on every EV_N copy (background)
+    KEEP   = os.getenv('KEEP'),
+    KEEP_N = 5000,
+    EV_N   = 10000,
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 112 links and exit
     ALIAS = '/' .. KEY,     -- chain name

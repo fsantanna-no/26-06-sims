@@ -1030,7 +1030,10 @@
                 - reorders per merge (`p2p/ev/reorders.py`): order at
                   M vs each parent, moved = outside the common
                   prefix; only merges with snapshots at M, p1, p2
-                  (2198 of 5972 on S1; 1460 of 6492 on L45)
+                  (2385 of 6492 on S1; 1460 of 6492 on L45; same
+                  final DAG, head 4897248d; first S1 query ran on
+                  a stale head after a crash: redone, scripts now
+                  restore `main` at exit)
                     - parent 1 never moves (winner first); the
                       loser moves in 99.3% of merges
                     - moved per merge: mean 3.4, median 2, p90 8,
@@ -1038,8 +1041,37 @@
                     - 29% of merges also reorder inside the loser
                       (nested forks re-sorted)
                     - bias: only merges with stored snapshots
+                - blocked (old paper d), counterfactual rule 4.a
+                  on the open chain (`p2p/ev/blocked.py`): author
+                  reps at the post's parent, at post time
+                    - 5000 posts: 2617 first posts (welcome), 261
+                      unknown (parent without snapshot)
+                    - others 2122: blocked 10 (0.47%) with no
+                      welcome reps; 8 (0.38%) with W=500; 0 with
+                      W=1000 (old paper: 3.5%)
             - [x] report line: `work` (summed post + pull times)
               and `par` (work / elapsed); next runs only
+        - [ ] full usenet run (26/10/12): 33814 actions, lf-slot,
+          build ia-optim 175f19e; log `usenet-full-lf-slot`
+            - [x] env KEEP=<run>: copies S1/L45 every 5k to
+              `.freechains-keep/<run>-<a>k`; ev.sh every 10k
+              (log `ev-<run>-<a>k.log`; mid-run orders differ)
+            - [x] END: commits and bytes per pull, pulls per
+              peer by tier (received, served)
+            - [x] smoke test 30 actions: PASS
+            - [x] stopped (26/10/13) at 8796: ~9.3 d predicted,
+              pulls 0.8 -> 2.1 s; keep `usenet-full-lf-slot`
+            - cause: merge replay grows with DAG width (80-120
+              nearest actions per merge); 98% merges are real
+            - git ranges wrong (merge dates 0): false `voided`
+            - fixes: freechains `261013-merge-cost.md` (main)
+            - [x] byte counter: `--topo-order` in `p2p.lua`
+              (30-action smoke: PASS)
+            - [x] config: SYNC restore dropped the comma; fixed,
+              run scripts now match `{...}` only
+            - [x] freechains fixes A-D in ia-optim: tests pass;
+              1 merge at 8k 1.1 -> 0.65 s; big pulls -30%
+            - [ ] rerun full after the fix is installed
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)

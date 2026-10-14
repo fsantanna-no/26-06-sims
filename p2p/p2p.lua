@@ -180,7 +180,8 @@ end
 --[[
 -- Shell lines for one wave: one task per lane, all in parallel.
 -- `pull` records the sync kind (ff: receiver HEAD is an ancestor
--- of the source HEAD, else mg) and the sync time.
+-- of the source HEAD, else mg), the sync time, and the commits
+-- and bytes received.
 -- `post` records the post time and the new hash.
 -- Inputs:
 --  - tasks [table]: { {'pull', to, from, ts} | {'post', leaf, ts,
@@ -203,7 +204,12 @@ local function script (tasks)
         "  out=$(freechains --root=$T --now=$4 chain " .. G.ALIAS ..
             " sync recv $F" .. C .. " 2>&1); rc=$?",
         "  local t1=$(date +%s%N)",
-        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
+        -- received: commits, bytes of new objects (uncompressed);
+        -- --topo-order: merges are dated 0 (date walk errs)
+        "  local hn=$(git -C $T" .. C .. " rev-parse HEAD)",
+        "  local nc=$(git -C $T" .. C .. " rev-list --topo-order --count $ht..$hn)",
+        "  local nb=$(git -C $T" .. C .. " rev-list --topo-order --objects $ht..$hn | cut -d' ' -f1 | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '{s+=$1} END {print s+0}')",
+        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
         "}",
         -- post <lane> <leaf> <ts> <key> <msg>
         "post () {",
@@ -265,6 +271,8 @@ end
 local STATS = { pulls=0, idle=0, waves=0, wall=0, forks=0, noop=0 }
 local POST, FF, MG = {}, {}, {}     -- times (s), in order
 local BORN, VIS = {}, {}            -- post chain time; secs to everywhere
+local NC, NB = {}, {}               -- per pull: commits, bytes received
+local RX, TX = {}, {}               -- per peer: pulls received, served
 local TMAX = 0                      -- latest wave chain time
 
 --[[
@@ -324,6 +332,9 @@ local function wave (tasks, ts, act)
                     NAME[to], NAME[from], rc, rest))
             end
             STATS.pulls = STATS.pulls + 1
+            local nc, nb = rest:match("^(%d+):(%d+)")
+            NC[#NC+1], NB[#NB+1] = tonumber(nc), tonumber(nb)
+            RX[to], TX[from] = (RX[to] or 0) + 1, (TX[from] or 0) + 1
             local list = (k == 'ff') and FF or MG
             list[#list+1] = tonumber(ns) / 1e9
             for _, a in ipairs(gain[i]) do
@@ -383,6 +394,22 @@ local function sum (xs)
         s = s + x
     end
     return s
+end
+
+--[[
+-- Median, p90 and max of a list (sorts a copy).
+-- Inputs:
+--  - xs [table]: numbers
+-- Outputs:
+--  - [number]: median, p90, max (0 when empty)
+-- Callers:
+--  - main chunk [p2p.lua]: the END report
+--]]
+local function q (xs)
+    local ys = table.move(xs, 1, #xs, 1, {})
+    table.sort(ys)
+    return ys[(#ys + 1) // 2] or 0, ys[math.ceil(#ys * 0.9)] or 0,
+        ys[#ys] or 0
 end
 
 -------------------------------------------------------------------------------
@@ -777,6 +804,17 @@ for a, e in ipairs(EVENTS) do
         print(string.format("== %d sweep %.0fs  peer %s", a, sweep(),
             exec("du -sh " .. root(0) .. " | cut -f1")))
     end
+    if G.KEEP and a % G.KEEP_N == 0 then
+        -- copy S1, L45 (idle between actions); ev.sh in background
+        local k = string.format("%s/.freechains-keep/%s-%dk", DIR, G.KEEP, a // 1000)
+        exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
+            root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. k)
+        print(string.format("== %d kept %s", a, k))
+        if a % G.EV_N == 0 then
+            os.execute(string.format("sh %s/ev/ev.sh %s-%dk %d > %s/logs/ev-%s-%dk.log 2>&1 &",
+                DIR, G.KEEP, a // 1000, ts + 3600, DIR, G.KEEP, a // 1000))
+        end
+    end
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)
@@ -839,6 +877,23 @@ table.sort(R)
 print(string.format("== END actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
     NE, R[(#R+1)//2], R[#R], STATS.pulls,
     STATS.waves, STATS.wall, STATS.idle, now() - t0))
+-- per pull: commits and bytes received; per peer: pulls by tier
+local c1, c2, c3 = q(NC)
+local b1, b2, b3 = q(NB)
+print(string.format("== END per pull: commits median=%d p90=%d max=%d  bytes median=%d p90=%d max=%d  total=%.1fMB",
+    c1, c2, c3, b1, b2, b3, sum(NB) / 1e6))
+for _, t in ipairs({ 'S', 'M', 'L' }) do
+    local rx, tx = {}, {}
+    for p = 0, N-1 do
+        if TIER[p] == t then
+            rx[#rx+1], tx[#tx+1] = RX[p] or 0, TX[p] or 0
+        end
+    end
+    local r1, _, r3 = q(rx)
+    local t1, _, t3 = q(tx)
+    print(string.format("== END pulls per %s peer: received median=%d max=%d  served median=%d max=%d",
+        t, r1, r3, t1, t3))
+end
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, math.min(10, #keys)))
 print((bad_o == 0 and bad_r == 0 and norder == NE) and "== PASS" or "== FAIL")

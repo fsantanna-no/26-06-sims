@@ -1,6 +1,6 @@
 #!/bin/sh
 # Post hoc evidence from the kept peers of one run (S1 = p00,
-# L45 = p58): same order, clamps, reorders per merge.
+# L45 = p58): same order, clamps, reorders per merge, blocked.
 # Queries scratch copies: `.freechains-keep/<run>` stays untouched.
 # usage: ev.sh <run> <now>    (e.g. usenet-5k-lf-slot 741478668)
 #  - now: chain time for `list order` (last event + 1 h)
@@ -19,12 +19,16 @@ for p in p00 p58; do
     echo "== $p clamps"
     python3 clamps.py $T/$p.order $T/$p.times
 done
+cp -a $T/p00 $T/b00     # before reorders.py moves p00's main
 for p in p00 p58; do
     python3 reorders.py $T/$p 0 1 $N > $T/$p.reorders &
 done
+python3 blocked.py $T/b00 $K/keys 0 1 0 > $T/p00.blocked &
 wait
 for p in p00 p58; do
     echo "== $p reorders: $(head -1 $T/$p.reorders)"
     python3 sumr.py $T/$p.reorders
 done
+echo "== p00 blocked (open chain, counterfactual rule 4.a)"
+python3 sumb.py $T/p00.blocked
 rm -rf $T
