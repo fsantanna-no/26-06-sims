@@ -1082,8 +1082,29 @@
             - [x] smoke 30: ps 20% forks (lf 66%), PASS
             - expected forks ~ posts with another author's post in
               the staleness window: 1 h 12%, 6 h 48%, 24 h 81%
-            - [ ] runs (scratchpad `run3.sh`), keeps
-              `usenet-2k-{ao,ps,lf}`; table of results
+            - [x] ao: 0% forks, 116k pulls, 0.265 s per commit and
+              per action, total pull time 30.7 ks, PASS
+            - [x] ps: 42% forks, 0.43 merges per post, 59k pulls,
+              0.113 s per commit, 0.163 s per action, 18.9 ks
+              (-38% vs ao), PASS
+            - [ ] lf: HARD FORK at action 405 (pull L04 <- M1,
+              1989-04-12); all peers kept in
+              `usenet-2k-lf-hardfork` (2 GB)
+                - same action set on both sides; L04 has only extra
+                  merges; orders differ at 401 of 405 (e4e3f4a4
+                  vs 7647da91, posted 03-30 / 03-31)
+                - order depends on merge structure, not only on the
+                  action set; settle age is chain time, and sparse
+                  posting (8 days, 4 posts) makes the 4th-last
+                  action 182.9 h old > 168 h
+                - old build (175f19e) also hard-forks on this state;
+                  its own 5k run took a different DAG and passed
+                - decision pending: settle age from receipt time, or
+                  order invariant to merge structure
+                - `useful` (`p2p.lua:274`) skips merge-only pulls:
+                  divergent orders never reconcile in the sims
+                - plan: freechains `261014-merge-order.md` (main);
+                  failing test `tst/hardfork-merges.lua` (ia-optim)
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)
