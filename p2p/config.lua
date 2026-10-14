@@ -11,10 +11,16 @@ local RELAY = { simple = {0, 1800}, chat = {1, 2}, usenet = {1, 60} }
 local KEY   = (MODE == 'simple') and 'simple' or CORPUS
 local RL    = RELAY[KEY]
 
+-- env overrides (one run per command line, no file edits):
+-- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1
+local function env (k, v)
+    return tonumber(os.getenv(k) or '') or v
+end
+
 return {
     MODE  = MODE,
     SRC   = '../data/' .. CORPUS,  -- corpus: TSV + bodies (from p2p/)
-    LIMIT = 33814,          -- corpus: first LIMIT events (usenet: all)
+    LIMIT = env('LIMIT', 33814),    -- corpus: first LIMIT events (usenet: all)
     N_ACT = 20,             -- simple: number of actions
     T = {
         action = 3600,      -- simple: chain secs between actions
@@ -31,7 +37,11 @@ return {
     -- local first (26/10/10): session period (secs) per link
     -- kind, 0 = always on; UUCP-like: mids dial the supers every
     -- 6 h, leaves dial their mid every 24 h (seeded phases)
-    SYNC  = { SS = 0, SM = 0, LM = 0 },
+    SYNC  = { SS = 0, SM = env('SM', 0), LM = env('LM', 0) },
+    -- sync, post, re-sync (26/10/13): the author's leaf pulls
+    -- from its primary mid right before a post, and the mid
+    -- pulls the post right after (sessions as SYNC otherwise)
+    PRESYNC = (os.getenv('PRESYNC') == '1'),
     -- session phases on whole SLOT secs (shared dial-in times,
     -- so pulls share waves); 0 = any time
     SLOT  = 3600,

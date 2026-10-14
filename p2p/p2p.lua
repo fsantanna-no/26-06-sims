@@ -111,6 +111,17 @@ for p = 0, N-1 do
     end
 end
 
+-- the primary mid of each leaf: its first mid link (PRESYNC)
+local UP = {}
+for _, l in ipairs(LEAF) do
+    for _, q in ipairs(ADJ[l]) do
+        if TIER[q] == 'M' then
+            UP[l] = q
+            break
+        end
+    end
+end
+
 if G.DUMP then
     for _, e in ipairs(EDGES) do
         print(e[3], NAME[e[1]], NAME[e[2]])
@@ -180,8 +191,8 @@ end
 --[[
 -- Shell lines for one wave: one task per lane, all in parallel.
 -- `pull` records the sync kind (ff: receiver HEAD is an ancestor
--- of the source HEAD, else mg), the sync time, and the commits
--- and bytes received.
+-- of the source HEAD, else mg), the sync time, and the commits,
+-- bytes and actions (non-merge commits) received.
 -- `post` records the post time and the new hash.
 -- Inputs:
 --  - tasks [table]: { {'pull', to, from, ts} | {'post', leaf, ts,
@@ -209,7 +220,8 @@ local function script (tasks)
         "  local hn=$(git -C $T" .. C .. " rev-parse HEAD)",
         "  local nc=$(git -C $T" .. C .. " rev-list --topo-order --count $ht..$hn)",
         "  local nb=$(git -C $T" .. C .. " rev-list --topo-order --objects $ht..$hn | cut -d' ' -f1 | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '{s+=$1} END {print s+0}')",
-        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
+        "  local na=$(git -C $T" .. C .. " rev-list --topo-order --no-merges --count $ht..$hn)",
+        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
         "}",
         -- post <lane> <leaf> <ts> <key> <msg>
         "post () {",
@@ -271,7 +283,8 @@ end
 local STATS = { pulls=0, idle=0, waves=0, wall=0, forks=0, noop=0 }
 local POST, FF, MG = {}, {}, {}     -- times (s), in order
 local BORN, VIS = {}, {}            -- post chain time; secs to everywhere
-local NC, NB = {}, {}               -- per pull: commits, bytes received
+local NC, NB, NA = {}, {}, {}       -- per pull: commits, bytes, actions
+local PT = {}                       -- per pull: time (s)
 local RX, TX = {}, {}               -- per peer: pulls received, served
 local TMAX = 0                      -- latest wave chain time
 
@@ -332,8 +345,9 @@ local function wave (tasks, ts, act)
                     NAME[to], NAME[from], rc, rest))
             end
             STATS.pulls = STATS.pulls + 1
-            local nc, nb = rest:match("^(%d+):(%d+)")
-            NC[#NC+1], NB[#NB+1] = tonumber(nc), tonumber(nb)
+            local nc, nb, na = rest:match("^(%d+):(%d+):(%d+)")
+            NC[#NC+1], NB[#NB+1], NA[#NA+1] = tonumber(nc), tonumber(nb), tonumber(na)
+            PT[#PT+1] = tonumber(ns) / 1e9
             RX[to], TX[from] = (RX[to] or 0) + 1, (TX[from] or 0) + 1
             local list = (k == 'ff') and FF or MG
             list[#list+1] = tonumber(ns) / 1e9
@@ -672,6 +686,9 @@ local function step (first, ts, act)
     for _, t in ipairs(first) do
         tasks[#tasks+1] = t
         W[t[2]] = true
+        if t[1] == 'pull' then
+            R[t[3]] = true      -- its source: no writer in the wave
+        end
     end
     for i, x in ipairs(PEND) do
         local to, from = x[1], x[2]
@@ -785,6 +802,12 @@ for a, e in ipairs(EVENTS) do
     -- the post: fork if the author lacks earlier actions
     local l, key = author(e[2])
     AUTH[key] = true
+    -- sync, post, re-sync: first the leaf pulls from its mid
+    local m = G.PRESYNC and UP[l]
+    if m and useful(l, m) then
+        step({ { 'pull', l, m, ts } }, ts)
+        w = w + 1
+    end
     local miss = lacks(l)
     if miss > 0 then STATS.forks = STATS.forks + 1 end
     -- the post shares its wave with pulls due in its tick
@@ -793,6 +816,11 @@ for a, e in ipairs(EVENTS) do
     step({ { 'post', l, ts, key,
         e[3] and (e[3] .. ' by ' .. NAME[l]), e[4] } }, ts, a)
     arm(l, ts)
+    -- ... then the mid pulls the post (and relays it as usual)
+    if m then
+        step({ { 'pull', m, l, ts } }, ts)
+        w = w + 1
+    end
     w = w + 1
     R[#R+1] = w
     local nf, sf = mma(FF, jf)
@@ -877,6 +905,23 @@ table.sort(R)
 print(string.format("== END actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
     NE, R[(#R+1)//2], R[#R], STATS.pulls,
     STATS.waves, STATS.wall, STATS.idle, now() - t0))
+-- per pull: time, commits and actions received; time per
+-- received commit and per received action (totals, and the
+-- median of the per-pull ratios)
+do
+    local p1, p2, p3 = q(PT)
+    local a1, a2, a3 = q(NA)
+    local tc, ta = {}, {}
+    for i = 1, #PT do
+        if NC[i] > 0 then tc[#tc+1] = PT[i] / NC[i] end
+        if NA[i] > 0 then ta[#ta+1] = PT[i] / NA[i] end
+    end
+    local st, sc, sa = sum(PT), sum(NC), sum(NA)
+    print(string.format("== END per pull: time median=%.2f p90=%.2f max=%.2f mean=%.2f  actions median=%d p90=%d max=%d",
+        p1, p2, p3, st / math.max(1, #PT), a1, a2, a3))
+    print(string.format("== END per commit: %.3fs (total %.0fs / %d commits, median of pulls %.3f)  per action: %.3fs (%d actions, median %.3f)  commits per action %.2f",
+        st / math.max(1, sc), st, sc, (q(tc)), st / math.max(1, sa), sa, (q(ta)), sc / math.max(1, sa)))
+end
 -- per pull: commits and bytes received; per peer: pulls by tier
 local c1, c2, c3 = q(NC)
 local b1, b2, b3 = q(NB)

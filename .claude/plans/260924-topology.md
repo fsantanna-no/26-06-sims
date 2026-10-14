@@ -1072,6 +1072,18 @@
             - [x] freechains fixes A-D in ia-optim: tests pass;
               1 merge at 8k 1.1 -> 0.65 s; big pulls -30%
             - [ ] rerun full after the fix is installed
+        - [ ] usenet 2k x 3 policies (26/10/13, build 5ebae95):
+          always on (ao), sync/post/re-sync (ps), local first (lf)
+            - [x] PRESYNC: leaf pulls its primary mid before a post,
+              the mid pulls the post after (env PRESYNC=1)
+            - [x] env overrides: LIMIT, SM, LM, PRESYNC
+            - [x] END: time per pull, per received commit and
+              action; actions per pull; commits per action
+            - [x] smoke 30: ps 20% forks (lf 66%), PASS
+            - expected forks ~ posts with another author's post in
+              the staleness window: 1 h 12%, 6 h 48%, 24 h 81%
+            - [ ] runs (scratchpad `run3.sh`), keeps
+              `usenet-2k-{ao,ps,lf}`; table of results
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)
