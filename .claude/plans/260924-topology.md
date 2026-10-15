@@ -1169,7 +1169,23 @@
             - before (41a90a6, cold B): `logs/scale-41a90a6.log`,
               1k-34k (stopped at 57k by the reinstall)
             - [ ] rerun `scale.sh` on the fixed build (hideRefs),
-              started 26/10/15 10:16
+              started 26/10/15 10:16; 34k at 11:50, 100k ETA ~15:00
+            - 34k before -> after: noop 1.36 -> 0.13, ff 4.73 ->
+              0.50, merge 3.07 -> 0.59 s; clone 703 -> 712 s
+              (linear, ~21 ms/post); post 0.08 -> 0.13 s (why?)
+            - [x] rerun done 16:02, `logs/scale.log`; 100k: post
+              0.135, noop 0.27, ff 1.40, merge 1.49 s, clone 2809 s
+              (28 ms/post), repo 271 MB
+            - [ ] ff still linear 34k -> 100k (0.50 -> 1.40 s,
+              ~14 us/post): profile at 100k
+                - [x] profiled: 2 fetches x ~0.5 s = 90% of 1.2 s;
+                  each scans all 200k local refs (refs/local +
+                  refs/payloads) despite hideRefs: load 80 ms,
+                  mark_complete 165 ms, negotiator 150 ms
+                - `--negotiation-tip=refs/heads/main`: 0.54 -> 0.39
+                - root fix: fewer refs (freechains design)
+            - [ ] clone writes snapshots loose: 536k objects,
+              3.4 GB mid-clone (A packed: 219 MB)
             - pull time grows (0.22 -> 0.5 s, 0-3k), post flat
               (0.08 s): size or bigger pulls? viability worry
             - [ ] scaling test `p2p/scale.sh` (26/10/15 07:04):
