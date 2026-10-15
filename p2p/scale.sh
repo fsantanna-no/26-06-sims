@@ -4,7 +4,8 @@
 # Builds one chain on peer A (posts only, 10 keys round robin, 10 min
 # apart), and at each checkpoint N times, 3 reps each (median):
 #  - post   : one post on A
-#  - noop   : B (a copy of A) recv A, nothing new
+#  - noop   : B (a copy of A, warmed up by one pull) recv A,
+#             nothing new
 #  - ff     : A posts 1, B recv A (fast-forward, 1 commit)
 #  - merge  : A posts 1, B posts 1, B recv A (fork, 1 vs 1)
 #  - clone  : a fresh peer clones A
@@ -75,6 +76,9 @@ for C in $CPS; do
     for r in 1 2 3; do
         B=$BASE/B
         rm -rf $B; cp -a $A $B
+        # warm up: A never pulled, so B's first pull would pay a
+        # one-off full payload pass (no `payloads-missing` yet)
+        freechains --root=$B --now=$NOW chain /s sync recv $(repo $A) > /dev/null || exit 1
         # post (on A, keeps A ahead of B by 1)
         NOW=$((NOW + 600)); N=$((N + 1))
         P="$P $(timed freechains --root=$A --now=$NOW chain /s post --sign=$BASE/keys/k1 inline "post $N")"

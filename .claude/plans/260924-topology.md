@@ -1161,6 +1161,15 @@
             - [ ] scaling test rerun on ia-optim 41a90a6 (canonical
               merge + fetch fix), started 26/10/15; old partial
               log `logs/scale-5ebae95.log`
+            - pulls grow with the chain: git's connectivity check
+              loads all ~100k refs per fetch; fix `fetch.hideRefs`
+              (freechains plan `261015-pull-scale`, both branches)
+            - [x] `scale.sh`: warm B up with one pull before timing
+              (a never-pulled copy pays a one-off full payload pass)
+            - before (41a90a6, cold B): `logs/scale-41a90a6.log`,
+              1k-34k (stopped at 57k by the reinstall)
+            - [ ] rerun `scale.sh` on the fixed build (hideRefs),
+              started 26/10/15 10:16
             - pull time grows (0.22 -> 0.5 s, 0-3k), post flat
               (0.08 s): size or bigger pulls? viability worry
             - [ ] scaling test `p2p/scale.sh` (26/10/15 07:04):
