@@ -1153,6 +1153,14 @@
                 - merge-only pulls 767
             - [ ] full run `usenet-full-mix-churn` (started
               26/10/15 00:20; keeps every 5k, ev every 10k)
+                - stopped at 3431 (26/10/15): forks 51%; restart
+                  on the new build (canonical merge + fetch fix)
+            - scaling test: clone fails past ~1100 posts (fetch
+              refspecs past the 128 KB `sh -c` cap); freechains
+              plan `261015-fetch-argmax` (main)
+            - [ ] scaling test rerun on ia-optim 41a90a6 (canonical
+              merge + fetch fix), started 26/10/15; old partial
+              log `logs/scale-5ebae95.log`
             - pull time grows (0.22 -> 0.5 s, 0-3k), post flat
               (0.08 s): size or bigger pulls? viability worry
             - [ ] scaling test `p2p/scale.sh` (26/10/15 07:04):
