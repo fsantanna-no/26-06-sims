@@ -1155,6 +1155,9 @@
               26/10/15 00:20; keeps every 5k, ev every 10k)
                 - stopped at 3431 (26/10/15): forks 51%; restart
                   on the new build (canonical merge + fetch fix)
+                - old log `logs/usenet-full-mix-churn-stopped-3431.log`
+                - [ ] restarted 26/10/15 on ia-optim + hideRefs +
+                  negotiation tip; `logs/usenet-full-mix-churn.log`
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
