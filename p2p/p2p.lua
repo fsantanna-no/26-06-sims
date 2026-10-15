@@ -122,6 +122,22 @@ for _, l in ipairs(LEAF) do
     end
 end
 
+-- MIX: class of each peer (on | ps | lf): a mid's from G.MIX,
+-- a leaf's from its primary mid, supers always on
+local CLASS = {}
+if G.MIX then
+    for p = 0, N-1 do
+        if TIER[p] == 'S' then
+            CLASS[p] = 'on'
+        elseif TIER[p] == 'M' then
+            CLASS[p] = assert(G.MIX[NAME[p]], "mix: missing " .. NAME[p])
+        end
+    end
+    for _, l in ipairs(LEAF) do
+        CLASS[l] = CLASS[UP[l]]
+    end
+end
+
 if G.DUMP then
     for _, e in ipairs(EDGES) do
         print(e[3], NAME[e[1]], NAME[e[2]])
@@ -192,7 +208,8 @@ end
 -- Shell lines for one wave: one task per lane, all in parallel.
 -- `pull` records the sync kind (ff: receiver HEAD is an ancestor
 -- of the source HEAD, else mg), the sync time, and the commits,
--- bytes and actions (non-merge commits) received.
+-- bytes and actions (non-merge commits) received, the source
+-- HEAD and the receiver's new HEAD (MERGES).
 -- `post` records the post time and the new hash.
 -- Inputs:
 --  - tasks [table]: { {'pull', to, from, ts} | {'post', leaf, ts,
@@ -221,7 +238,7 @@ local function script (tasks)
         "  local nc=$(git -C $T" .. C .. " rev-list --topo-order --count $ht..$hn)",
         "  local nb=$(git -C $T" .. C .. " rev-list --topo-order --objects $ht..$hn | cut -d' ' -f1 | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '{s+=$1} END {print s+0}')",
         "  local na=$(git -C $T" .. C .. " rev-list --topo-order --no-merges --count $ht..$hn)",
-        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
+        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na:$hf:$hn $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
         "}",
         -- post <lane> <leaf> <ts> <key> <msg>
         "post () {",
@@ -262,8 +279,14 @@ end
 
 local HOLD, CNT, ACTIVE = {}, {}, {}
 
+-- MERGES: each peer's HEAD, and the HEADs it absorbed (its own,
+-- pulled ones): a source HEAD outside the set may hold merges
+local HEAD, SEEN = {}, {}
+local MGONLY = 0                    -- pulls for merges only
+
 --[[
 -- Is a pull useful: the source holds an action the receiver lacks?
+-- With MERGES, also: the source HEAD is unseen by the receiver.
 -- Inputs:
 --  - to, from [integer]: receiver, source
 -- Outputs:
@@ -277,6 +300,11 @@ local function useful (to, from)
             return true
         end
     end
+    local h = HEAD[from]
+    if G.MERGES and h and not (SEEN[to] and SEEN[to][h]) then
+        MGONLY = MGONLY + 1
+        return true
+    end
     return false
 end
 
@@ -287,6 +315,10 @@ local NC, NB, NA = {}, {}, {}       -- per pull: commits, bytes, actions
 local PT = {}                       -- per pull: time (s)
 local RX, TX = {}, {}               -- per peer: pulls received, served
 local TMAX = 0                      -- latest wave chain time
+local RCN = {}                      -- churn: commits per reconnect pull
+local CH = { defer=0, backup=0, ring=0, rc=0 }   -- churn: pull counts
+local CLA, PCL = {}, {}             -- MIX: class per action, per pull
+local MXP, MXF, MXV = {}, {}, {}    -- MIX: posts, forks, visibility per class
 
 --[[
 -- Run one wave: the tasks, one per lane, in parallel.
@@ -338,6 +370,9 @@ local function wave (tasks, ts, act)
             end
             POST[#POST+1] = tonumber(ns) / 1e9
             HOLD[act], CNT[act], ACTIVE[act] = { [to] = true }, 1, true
+            HEAD[to] = rest
+            SEEN[to] = SEEN[to] or {}
+            SEEN[to][rest] = true
             BORN[act] = ts
         else
             if rc ~= '0' then
@@ -345,10 +380,19 @@ local function wave (tasks, ts, act)
                     NAME[to], NAME[from], rc, rest))
             end
             STATS.pulls = STATS.pulls + 1
-            local nc, nb, na = rest:match("^(%d+):(%d+):(%d+)")
+            local nc, nb, na, hf, hn =
+                rest:match("^(%d+):(%d+):(%d+):(%x*):(%x*)")
             NC[#NC+1], NB[#NB+1], NA[#NA+1] = tonumber(nc), tonumber(nb), tonumber(na)
             PT[#PT+1] = tonumber(ns) / 1e9
+            PCL[#PT] = CLASS[to]
+            if tasks[i][5] == 'rc' then
+                CH.rc = CH.rc + 1
+                RCN[#RCN+1] = tonumber(nc)
+            end
             RX[to], TX[from] = (RX[to] or 0) + 1, (TX[from] or 0) + 1
+            HEAD[to] = hn
+            SEEN[to] = SEEN[to] or {}
+            SEEN[to][hf], SEEN[to][hn] = true, true
             local list = (k == 'ff') and FF or MG
             list[#list+1] = tonumber(ns) / 1e9
             for _, a in ipairs(gain[i]) do
@@ -363,6 +407,10 @@ local function wave (tasks, ts, act)
         if CNT[a] == N then
             ACTIVE[a], HOLD[a] = nil, nil
             VIS[#VIS+1] = ts - BORN[a]
+            if CLA[a] then
+                local v = MXV[CLA[a]] or {}
+                v[#v+1], MXV[CLA[a]] = ts - BORN[a], v
+            end
         end
     end
     return #tasks
@@ -520,15 +568,16 @@ local HEAP, TIMER = {}, {}          -- pending fires; peer -> fire time
 --  - t [number]: chain time of the fire
 --  - p [integer]: peer (source)
 --  - q [integer|nil]: receiver of a deferred pull (session)
+--  - tag [string|nil]: churn: 'rc' reconnect, 'df' deferred pull
 -- Outputs:
 --  - none
 -- Callers:
 --  - arm, due [p2p.lua]
 --]]
 local SEQ = 0
-local function hpush (t, p, q)
+local function hpush (t, p, q, tag)
     SEQ = SEQ + 1
-    local e, i = { t, SEQ, p, q }, #HEAP + 1
+    local e, i = { t, SEQ, p, q, tag }, #HEAP + 1
     HEAP[i] = e
     while i > 1 do
         local j = i // 2
@@ -610,9 +659,202 @@ for p = 0, N-1 do
     end
 end
 
+-------------------------------------------------------------------------------
+-- churn: seeded outages per peer (G.CHURN), own RNG
+
+local DOWN = {}                     -- peer -> { {s, e}, ... } in order
+local BK, RING = {}, {}             -- leaf -> backup mid; mid -> ring mids
+for _, e in ipairs(BKUP) do
+    if e[3] == 'LX' then
+        BK[e[1]] = e[2]
+    else
+        RING[e[1]] = RING[e[1]] or {}
+        RING[e[2]] = RING[e[2]] or {}
+        table.insert(RING[e[1]], e[2])
+        table.insert(RING[e[2]], e[1])
+    end
+end
+
+--[[
+-- A uniform RNG in [0, 1) (xorshift64), independent of math.random.
+-- Inputs:
+--  - seed [integer]: non-zero seed
+-- Outputs:
+--  - [function]: each call returns the next number
+-- Callers:
+--  - main chunk [p2p.lua]: the outage schedule
+--]]
+local function rng (seed)
+    local x = seed
+    return function ()
+        x = x ~ (x << 13)
+        x = x ~ (x >> 7)
+        x = x ~ (x << 17)
+        return ((x >> 11) & ((1 << 53) - 1)) / 2.0^53
+    end
+end
+
+--[[
+-- Availability of a peer under churn (nil: no outages).
+-- Inputs:
+--  - p [integer]: peer id
+-- Outputs:
+--  - [number|nil]: fraction of time up
+-- Callers:
+--  - main chunk [p2p.lua]: the outage schedule
+--]]
+local function avail (p)
+    local C = G.CHURN
+    local c = CLASS[p]
+    if TIER[p] == 'S' then
+        return C.S
+    elseif TIER[p] == 'M' then
+        return (c == nil or c == 'on') and C.on or C.mid
+    elseif c == 'on' or (c == nil and (SYNC.LM or 0) <= 0) then
+        return C.on
+    end
+    return nil              -- leaf with sessions
+end
+
+--[[
+-- The outage of a peer that covers a chain time.
+-- Inputs:
+--  - p [integer]: peer id
+--  - t [number]: chain time
+-- Outputs:
+--  - [table|nil]: { s, e } covering t, nil when up
+-- Callers:
+--  - up, nextup [p2p.lua]
+--]]
+local function outage (p, t)
+    local D = DOWN[p]
+    if not D then
+        return nil
+    end
+    local lo, hi = 1, #D
+    while lo <= hi do
+        local m = (lo + hi) // 2
+        if D[m][2] <= t then
+            lo = m + 1
+        elseif D[m][1] > t then
+            hi = m - 1
+        else
+            return D[m]
+        end
+    end
+    return nil
+end
+
+--[[
+-- Is a peer up at a chain time.
+-- Inputs:
+--  - p [integer]: peer id
+--  - t [number]: chain time
+-- Outputs:
+--  - [boolean]
+-- Callers:
+--  - route [p2p.lua]
+--]]
+local function up (p, t)
+    return outage(p, t) == nil
+end
+
+--[[
+-- Chain time when a peer is up again (t itself when up).
+-- Inputs:
+--  - p [integer]: peer id
+--  - t [number]: chain time
+-- Outputs:
+--  - [number]: the end of the covering outage, or t
+-- Callers:
+--  - route [p2p.lua]
+--]]
+local function nextup (p, t)
+    local o = outage(p, t)
+    return o and o[2] or t
+end
+
+if G.CHURN then
+    local C = G.CHURN
+    local t0 = EVENTS[1][1]
+    local t1 = EVENTS[#EVENTS][1] + 86400
+    -- Pareto with median `down`, capped: xm and the capped mean
+    local a = C.alpha
+    local xm = C.down / 2^(1/a)
+    local md = xm * a / (a - 1) - xm^a * C.cap^(1 - a) / (a - 1)
+    for p = 0, N-1 do
+        local av = avail(p)
+        if av then
+            local r = rng(C.seed * 1000003 + p + 1)
+            local mu = md * av / (1 - av)   -- mean up time
+            local D, t = {}, t0 + r() * mu
+            while t < t1 do
+                local d = math.min(C.cap, xm * (1 - r())^(-1 / a))
+                D[#D+1] = { t, t + d }
+                -- reconnect: pull from every primary neighbour
+                for _, q in ipairs(ADJ[p]) do
+                    hpush(t + d, q, p, 'rc')
+                end
+                t = t + d - math.log(1 - r()) * mu
+            end
+            DOWN[p] = D
+        end
+    end
+end
+
+--[[
+-- Route a pull under churn: both ends up as is; a leaf whose
+-- mid is down uses its backup mid; a mid whose supers are all
+-- down uses an up ring mid; else defer to when both are up.
+-- Inputs:
+--  - to, from [integer]: receiver, source
+--  - t        [number]: chain time
+--  - tag      [string|nil]: kept on a deferred pull
+-- Outputs:
+--  - [integer|nil]: receiver, source (nil: deferred)
+-- Callers:
+--  - step, main chunk [p2p.lua]
+--]]
+local function route (to, from, t, tag)
+    if not G.CHURN or (up(to, t) and up(from, t)) then
+        return to, from
+    end
+    -- the end that is up, the one that is down
+    local u, d = to, from
+    if not up(to, t) then u, d = from, to end
+    if up(u, t) then
+        local alt
+        if TIER[u] == 'L' and d == UP[u] and BK[u] and up(BK[u], t) then
+            alt = BK[u]
+            CH.backup = CH.backup + 1
+        elseif TIER[u] == 'M' and TIER[d] == 'S' then
+            local any = false
+            for _, q in ipairs(ADJ[u]) do
+                if TIER[q] == 'S' and up(q, t) then any = true end
+            end
+            if not any then
+                for _, q in ipairs(RING[u] or {}) do
+                    if up(q, t) then alt = q; break end
+                end
+                if alt then CH.ring = CH.ring + 1 end
+            end
+        end
+        if alt then
+            if u == to then return to, alt end
+            return alt, from
+        end
+    end
+    CH.defer = CH.defer + 1
+    local s = math.max(nextup(to, t), nextup(from, t))
+    if s <= t then s = t + 1 end
+    hpush(s, from, to, tag or 'df')     -- tagged: no session flag
+    return nil
+end
+
 --[[
 -- Next session of a scheduled link at or after a chain time.
--- The lower-tier peer owns the link (mid: SM, leaf: LM).
+-- The lower-tier peer owns the link (mid: SM, leaf: LM); an
+-- owner of class on (MIX) is always on.
 -- Inputs:
 --  - p, q [integer]: the link ends
 --  - t    [number]: chain time
@@ -624,10 +866,10 @@ end
 local function session (p, q, t)
     local k = KIND[p][q]
     local per = SYNC[k] or 0
-    if per <= 0 then
-        return nil
-    end
     local o = (TIER[p] == 'L' or (TIER[p] == 'M' and k == 'SM')) and p or q
+    if per <= 0 or CLASS[o] == 'on' then
+        return nil              -- always on (MIX: class on)
+    end
     local ph = PHASE[o]
     return ph + math.ceil((t - ph) / per) * per
 end
@@ -648,8 +890,10 @@ local function due (lim)
         local e = hpop()
         local t, p, r = e[1], e[3], e[4]
         if r then                       -- session: deferred pull
-            SCHED[p .. ':' .. r] = nil
-            PEND[#PEND+1] = { r, p, t }
+            if not e[5] then
+                SCHED[p .. ':' .. r] = nil
+            end
+            PEND[#PEND+1] = { r, p, t, e[5] }
         elseif TIMER[p] == t then
             TIMER[p] = nil
             for _, q in ipairs(ADJ[p]) do
@@ -691,17 +935,19 @@ local function step (first, ts, act)
         end
     end
     for i, x in ipairs(PEND) do
-        local to, from = x[1], x[2]
         if #tasks >= G.LANES then
             table.move(PEND, i, #PEND, #rest + 1, rest)
             break
         end
-        if W[to] or R[to] or WD[to] or RD[to] or W[from] or WD[from] then
-            rest[#rest+1] = x
+        local to, from = route(x[1], x[2], x[3], x[4])
+        if not to then
+            -- deferred (churn)
+        elseif W[to] or R[to] or WD[to] or RD[to] or W[from] or WD[from] then
+            rest[#rest+1] = { to, from, x[3], x[4] }
             WD[to], RD[from] = true, true
         elseif useful(to, from) then
             W[to], R[from] = true, true
-            tasks[#tasks+1] = { 'pull', to, from, math.floor(x[3]) }
+            tasks[#tasks+1] = { 'pull', to, from, math.floor(x[3]), x[4] }
         else
             STATS.noop = STATS.noop + 1
         end
@@ -803,13 +1049,22 @@ for a, e in ipairs(EVENTS) do
     local l, key = author(e[2])
     AUTH[key] = true
     -- sync, post, re-sync: first the leaf pulls from its mid
-    local m = G.PRESYNC and UP[l]
-    if m and useful(l, m) then
-        step({ { 'pull', l, m, ts } }, ts)
-        w = w + 1
+    local m = (G.PRESYNC or CLASS[l] == 'ps') and UP[l]
+    if m then
+        local to, from = route(l, m, ts)
+        if to and useful(to, from) then
+            step({ { 'pull', to, from, ts } }, ts)
+            w = w + 1
+        end
     end
     local miss = lacks(l)
     if miss > 0 then STATS.forks = STATS.forks + 1 end
+    if G.MIX then
+        local c = CLASS[l]
+        CLA[a] = c
+        MXP[c] = (MXP[c] or 0) + 1
+        MXF[c] = (MXF[c] or 0) + ((miss > 0) and 1 or 0)
+    end
     -- the post shares its wave with pulls due in its tick
     TICK = (math.floor(ts / G.T.tick) + 1) * G.T.tick
     due(TICK)
@@ -818,8 +1073,11 @@ for a, e in ipairs(EVENTS) do
     arm(l, ts)
     -- ... then the mid pulls the post (and relays it as usual)
     if m then
-        step({ { 'pull', m, l, ts } }, ts)
-        w = w + 1
+        local to, from = route(m, l, ts)
+        if to then
+            step({ { 'pull', to, from, ts } }, ts)
+            w = w + 1
+        end
     end
     w = w + 1
     R[#R+1] = w
@@ -867,6 +1125,8 @@ print(string.format("== END drain waves=%d", dw))
 local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
 print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
     STATS.forks, NE, 100*STATS.forks//NE, merges))
+print(string.format("== END pulls dropped (nothing new)=%d  merge-only=%d",
+    STATS.noop, MGONLY))
 table.sort(VIS)
 print(string.format("== END visibility (post -> all peers) secs: median=%.0f p90=%.0f max=%.0f",
     VIS[(#VIS + 1) // 2] or 0, VIS[math.ceil(#VIS * 0.9)] or 0, VIS[#VIS] or 0))
@@ -921,6 +1181,50 @@ do
         p1, p2, p3, st / math.max(1, #PT), a1, a2, a3))
     print(string.format("== END per commit: %.3fs (total %.0fs / %d commits, median of pulls %.3f)  per action: %.3fs (%d actions, median %.3f)  commits per action %.2f",
         st / math.max(1, sc), st, sc, (q(tc)), st / math.max(1, sa), sa, (q(ta)), sc / math.max(1, sa)))
+end
+-- MIX, per class (author's leaf; pulls by receiver): forks,
+-- visibility, time per pull, per received commit and action
+if G.MIX then
+    for _, c in ipairs({ 'on', 'ps', 'lf' }) do
+        local n, st, sc, sa = 0, 0, 0, 0
+        for i = 1, #PT do
+            if PCL[i] == c then
+                n, st = n + 1, st + PT[i]
+                sc, sa = sc + NC[i], sa + NA[i]
+            end
+        end
+        local v1, v2, v3 = q(MXV[c] or {})
+        print(string.format("== END class %s: forks=%d of %d (%d%%)  visibility median=%.0f p90=%.0f max=%.0f  pulls=%d  per pull %.2fs  per commit %.3fs  per action %.3fs",
+            c, MXF[c] or 0, MXP[c] or 0,
+            100 * (MXF[c] or 0) // math.max(1, MXP[c] or 0), v1, v2, v3,
+            n, st / math.max(1, n), st / math.max(1, sc),
+            st / math.max(1, sa)))
+    end
+end
+-- churn: realized downtime per tier, rerouted, deferred and
+-- reconnect pulls (commits caught up per reconnect pull)
+if G.CHURN then
+    local span = EVENTS[NE][1] - EVENTS[1][1]
+    local dt = {}
+    for _, t in ipairs({ 'S', 'M', 'L' }) do
+        local s, n = 0, 0
+        for p = 0, N-1 do
+            if TIER[p] == t and DOWN[p] then
+                n = n + 1
+                for _, o in ipairs(DOWN[p]) do
+                    if o[1] < EVENTS[NE][1] then
+                        s = s + math.min(o[2], EVENTS[NE][1]) - o[1]
+                    end
+                end
+            end
+        end
+        dt[#dt+1] = string.format("%s %.1f%% (%d peers)", t,
+            100 * s / math.max(1, n * span), n)
+    end
+    local r1, r2, r3 = q(RCN)
+    print(string.format("== END churn: down %s  deferred=%d  backup=%d  ring=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
+        table.concat(dt, ", "), CH.defer, CH.backup, CH.ring, CH.rc,
+        r1, r2, r3))
 end
 -- per pull: commits and bytes received; per peer: pulls by tier
 local c1, c2, c3 = q(NC)

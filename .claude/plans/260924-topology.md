@@ -1105,6 +1105,65 @@
                   divergent orders never reconcile in the sims
                 - plan: freechains `261014-merge-order.md` (main);
                   failing test `tst/hardfork-merges.lua` (ia-optim)
+                - [x] `MERGES=1` (26/10/14): `useful` also pulls an
+                  unseen source HEAD; END counts merge-only pulls
+                - [x] smoke lf 30: PASS with and without, same
+                  1085 pulls (merge-only 0: no drift in 30)
+                - [x] lf 2k with `MERGES=1` (`usenet-2k-lf-mg`):
+                  PASS; 82% forks, 2240 merges, 437 merge-only
+                  pulls; 56.7k pulls, 0.48 s mean; 0.111 s per
+                  commit, 0.236 s per action, 2.14 commits per
+                  action; 27.4 ks; 83.8 MB; 4 h 01 min
+        - [ ] mixed classes for the full run (26/10/14, `MIX=1`):
+          each mid and its leaves share one class
+            - on: M1 M3 M9 (22 leaves), mids and leaves always on
+            - ps: M2 M6 M8 (12), 6 h / 24 h + sync around posts
+            - lf: M4 M5 M7 (11), 6 h / 24 h sessions only
+            - M4, M6 swapped (M1 had only lf ring neighbours)
+            - figure: `p2p/hubs50.dia` fills green/yellow/red,
+              legend line; paper `2606-vcs/imgs/topo.{dia,pdf}`
+              recolored, caption updated (`main.tex:1226`)
+        - [ ] churn (26/10/14, `CHURN=1`), before the full run
+            - seeded outages per peer, own RNG (xorshift)
+            - up: supers 99%, always-on mids/leaves 95%, session
+              mids 90%; session leaves none (sessions = uptime)
+            - downtime Pareto, median 1 h, shape 1.5, cap 3 days
+            - pull with an end down: leaf -> backup mid; mid with
+              all supers down -> ring mid; else deferred
+            - reconnect: pull from every primary neighbour
+            - END: downtime per tier, deferred, backup, ring,
+              reconnect pulls and commits caught up
+            - [x] code; [x] smoke 30 (+MIX, MERGES): PASS; down
+              S 1.1%, M 8.5%, L 5.6%; 204 deferred, 76 backup,
+              13 ring, 101 reconnect pulls; [ ] full run
+            - [x] 2k (+MIX, MERGES) crashed at 1001: freechains
+              bug, `winner` peeks a deferred floor snapshot
+              ("no snapshot"); fixed in ia-optim (`flush()` in
+              `sync.lua`), test `tst/bug-floor-snapshot.lua`,
+              47/47 suites + guide.sh pass
+            - [x] reinstalled (= ia-optim + fix), crash pull rc=0
+            - [x] rerun 2k (26/10/14, 3 h 56 min): PASS, forks
+              44%, merges 728, 82.9k pulls, 0.168 s per commit,
+              0.231 s per action, 1.37 commits per action, 67 MB
+                - on 32%, ps 43%, lf 67% forks; visibility median
+                  100 / 107 / 133 ks
+                - down S 1.1%, M 8.2%, L 5.0%; 9091 deferred, 3327
+                  backup (4.0%), 131 ring (0.2%), 4415 reconnect
+                  pulls (commits median 1, max 33)
+                - merge-only pulls 767
+            - [ ] full run `usenet-full-mix-churn` (started
+              26/10/15 00:20; keeps every 5k, ev every 10k)
+            - pull time grows (0.22 -> 0.5 s, 0-3k), post flat
+              (0.08 s): size or bigger pulls? viability worry
+            - [ ] scaling test `p2p/scale.sh` (26/10/15 07:04):
+              one chain, posts only, at 1k 5k 10k 34k 100k: post,
+              noop / ff / merge pull, clone; `logs/scale.log`
+            - [ ] rerun scaling on the post-only DAG build
+            - supers always on; chat stays always on
+            - END per class: forks, visibility, time per pull,
+              per commit, per action
+            - [x] code; [x] smoke 30 (before swap): PASS, forks
+              on 16%, ps 23%, lf 54%; [ ] full run
         - asymmetric topology: no cost vs old at these rates;
           its effect is in forks under delay (simple 45% vs
           25-31%)

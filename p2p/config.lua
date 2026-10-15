@@ -12,7 +12,8 @@ local KEY   = (MODE == 'simple') and 'simple' or CORPUS
 local RL    = RELAY[KEY]
 
 -- env overrides (one run per command line, no file edits):
--- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1
+-- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1, MERGES=1, MIX=1,
+-- CHURN=1
 local function env (k, v)
     return tonumber(os.getenv(k) or '') or v
 end
@@ -42,6 +43,37 @@ return {
     -- from its primary mid right before a post, and the mid
     -- pulls the post right after (sessions as SYNC otherwise)
     PRESYNC = (os.getenv('PRESYNC') == '1'),
+    -- merge-only pulls (26/10/14): also pull when the source HEAD
+    -- is unseen by the receiver (as git), not only on a missing
+    -- action; else equal posts in other merges never reconcile
+    -- and hard fork after 7 days (freechains 261014-merge-order)
+    MERGES = (os.getenv('MERGES') == '1'),
+    -- mixed classes (26/10/14): each mid and its leaves share one
+    -- class, 49/27/24 of the leaves (22/12/11; M4, M6 swapped so
+    -- M1 has a ps neighbour): on = always on
+    -- (mid too), ps = sessions + sync around posts (PRESYNC),
+    -- lf = sessions only; supers always on; needs SM, LM
+    MIX = (os.getenv('MIX') == '1') and {
+        M1 = 'on', M3 = 'on', M9 = 'on',
+        M2 = 'ps', M6 = 'ps', M8 = 'ps',
+        M4 = 'lf', M5 = 'lf', M7 = 'lf',
+    } or nil,
+    -- churn (26/10/14): seeded outages per peer, own RNG (the
+    -- run's random sequence is kept); availability by tier and
+    -- class; leaves with sessions have none (sessions are their
+    -- uptime); downtime Pareto (median `down`, shape `alpha`,
+    -- capped below the 7-day window); a leaf whose mid is down
+    -- uses its backup mid, a mid whose supers are all down its
+    -- ring; reconnects pull from every primary neighbour
+    CHURN = (os.getenv('CHURN') == '1') and {
+        S = 0.99,           -- supers
+        on = 0.95,          -- always-on mids and leaves
+        mid = 0.90,         -- session mids (ps, lf)
+        down = 3600,        -- median outage (secs)
+        alpha = 1.5,        -- Pareto shape (heavy tail)
+        cap = 3 * 86400,    -- longest outage (secs)
+        seed = 1,
+    } or nil,
     -- session phases on whole SLOT secs (shared dial-in times,
     -- so pulls share waves); 0 = any time
     SLOT  = 3600,
