@@ -1158,6 +1158,9 @@
                 - old log `logs/usenet-full-mix-churn-stopped-3431.log`
                 - [ ] restarted 26/10/15 on ia-optim + hideRefs +
                   negotiation tip; `logs/usenet-full-mix-churn.log`
+                - killed at 20896 (26/10/17, 39 h): low memory,
+                  reaped by Claude Code; forks 70%, ff median 0.39;
+                  kept 5k-20k; plan 261017-resume, then restart
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
