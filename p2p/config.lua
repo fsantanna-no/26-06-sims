@@ -13,7 +13,7 @@ local RL    = RELAY[KEY]
 
 -- env overrides (one run per command line, no file edits):
 -- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1, MERGES=1, MIX=1,
--- CHURN=1
+-- CHURN=1, EV_N=<n>, CKPT_N=<n>, RESUME=1, BASE=<dir>
 local function env (k, v)
     return tonumber(os.getenv(k) or '') or v
 end
@@ -81,14 +81,22 @@ return {
                             -- (keeps peers ~5 MB, not ~200 MB loose)
     -- kept copies (S1, L45, keys) of a run, while it runs: env
     -- KEEP=<run> copies every KEEP_N actions to .freechains-keep/
-    -- <run>-<a>; ev/ev.sh runs on every EV_N copy (background)
+    -- <run>-<a>; ev/ev.sh runs on every EV_N copy (background;
+    -- 0: off, run it on the kept copies after: ~2.5 GB at 20k)
     KEEP   = os.getenv('KEEP'),
     KEEP_N = 5000,
-    EV_N   = 10000,
+    EV_N   = env('EV_N', 10000),
+    -- checkpoint every CKPT_N actions (0: off): the run state
+    -- (`state.lua`) and a copy of BASE at <BASE>.ckpt; the RNG
+    -- is reseeded there (SEED, a), so a resumed run equals an
+    -- uninterrupted one; RESUME=1 restarts from the checkpoint
+    -- (26/10/17, plan 261017-resume)
+    CKPT_N = env('CKPT_N', 5000),
+    RESUME = (os.getenv('RESUME') == '1'),
     SEED  = 1,              -- random seed
     DUMP  = false,          -- print the 112 links and exit
     ALIAS = '/' .. KEY,     -- chain name
-    BASE  = './.freechains-p2p-' .. KEY,   -- peers dir, wiped on start
+    BASE  = os.getenv('BASE') or ('./.freechains-p2p-' .. KEY),   -- peers dir, wiped on start
     T0    = 1700000000,     -- simple: chain time before the first action
                             -- (corpus: first event - 3600)
 }

@@ -23,7 +23,8 @@
 -- Every SWEEP actions, all peers sweep (pack loose objects).
 -- MODE=simple: artificial inline posts.
 -- MODE=corpus: the first LIMIT events of SRC.tsv (posts only).
--- SINGLE RUN: G.BASE is wiped on start.
+-- SINGLE RUN: G.BASE is wiped on start (RESUME=1: restored
+-- from the last checkpoint instead, see G.CKPT_N).
 -- Settings: edit config.lua (table G, no env).
 
 -------------------------------------------------------------------------------
@@ -499,34 +500,41 @@ end
 -- setup: S1 inits, the others clone from an already created
 -- neighbour (BFS order, one BFS layer per parallel step)
 
-os.execute("rm -rf " .. G.BASE)
-os.execute("mkdir -p " .. KEYS)
-exec("freechains --root=" .. root(0) .. " --now=" .. G.T0 ..
-    " chains add '" .. G.ALIAS .. "' init")
-local made, layer = { [0] = true }, { 0 }
-while #layer > 0 do
-    local sh, next = {}, {}
-    for _, p in ipairs(layer) do
-        for _, q in ipairs(ADJ[p]) do
-            if not made[q] then
-                made[q] = true
-                next[#next+1] = q
-                sh[#sh+1] = "freechains --root=" .. root(q) ..
-                    " chains add '" .. G.ALIAS .. "' clone " .. dir(p) ..
-                    " > /dev/null 2>&1 &"
+-- the last checkpoint: run state and a copy of G.BASE
+local CKPT = G.BASE .. '.ckpt'
+if G.RESUME then
+    -- peers as they were at the checkpoint (it stays intact)
+    exec("rm -rf " .. G.BASE .. " && cp -a " .. CKPT .. " " .. G.BASE)
+else
+    os.execute("rm -rf " .. G.BASE)
+    os.execute("mkdir -p " .. KEYS)
+    exec("freechains --root=" .. root(0) .. " --now=" .. G.T0 ..
+        " chains add '" .. G.ALIAS .. "' init")
+    local made, layer = { [0] = true }, { 0 }
+    while #layer > 0 do
+        local sh, next = {}, {}
+        for _, p in ipairs(layer) do
+            for _, q in ipairs(ADJ[p]) do
+                if not made[q] then
+                    made[q] = true
+                    next[#next+1] = q
+                    sh[#sh+1] = "freechains --root=" .. root(q) ..
+                        " chains add '" .. G.ALIAS .. "' clone " .. dir(p) ..
+                        " > /dev/null 2>&1 &"
+                end
             end
         end
+        if #sh > 0 then
+            local f = io.open(G.BASE .. '/clone.sh', 'w')
+            f:write(table.concat(sh, "\n") .. "\nwait\n")
+            f:close()
+            os.execute("bash " .. G.BASE .. "/clone.sh")
+        end
+        layer = next
     end
-    if #sh > 0 then
-        local f = io.open(G.BASE .. '/clone.sh', 'w')
-        f:write(table.concat(sh, "\n") .. "\nwait\n")
-        f:close()
-        os.execute("bash " .. G.BASE .. "/clone.sh")
-    end
-    layer = next
+    local ok0, n0 = heads()
+    assert(ok0, "setup : clones disagree (" .. n0 .. " heads)")
 end
-local ok0, n0 = heads()
-assert(ok0, "setup : clones disagree (" .. n0 .. " heads)")
 
 -- keys: one per leaf (simple), one per author (corpus, lazily)
 local KEYOF, PLACE, NAUTH = {}, {}, 0
@@ -1039,7 +1047,172 @@ end
 local R, AUTH = {}, {}
 local t0 = now()
 local NE = #EVENTS
-for a, e in ipairs(EVENTS) do
+
+-------------------------------------------------------------------------------
+-- checkpoint: the run state as Lua source, between actions
+
+--[[
+-- A number as Lua source (floats stay floats, inf as 1e999).
+-- Inputs:
+--  - v [number]
+-- Outputs:
+--  - [string]: also read back by `tonumber`
+-- Callers:
+--  - dump [p2p.lua]
+--]]
+local function num (v)
+    if math.type(v) == 'integer' then
+        return string.format('%d', v)
+    elseif v == math.huge or v == -math.huge then
+        return (v > 0) and '1e999' or '-1e999'
+    end
+    local x = string.format('%.17g', v)
+    if not x:find('[.eE]') then x = x .. '.0' end
+    return x
+end
+
+--[[
+-- Append the Lua source of a value (no shared or cyclic tables).
+-- Lists of numbers or words and sets of words are packed into
+-- one string (N, L, S), unpacked by `restore`.
+-- Inputs:
+--  - v   [number|string|boolean|table]
+--  - out [table]: source pieces
+-- Outputs:
+--  - none (appends to `out`)
+-- Callers:
+--  - dump (itself), save [p2p.lua]
+--]]
+local function dump (v, out)
+    local t = type(v)
+    if t == 'number' then
+        out[#out+1] = num(v)
+    elseif t == 'string' then
+        out[#out+1] = string.format('%q', v)
+    elseif t == 'boolean' then
+        out[#out+1] = tostring(v)
+    else
+        assert(t == 'table', "dump : " .. t)
+        local n, c, nl, wl, ws = #v, 0, true, true, true
+        for k, x in pairs(v) do
+            c = c + 1
+            local ik = math.type(k) == 'integer' and k >= 1 and k <= n
+            nl = nl and ik and type(x) == 'number'
+            wl = wl and ik and type(x) == 'string' and x:find('^%S+$') ~= nil
+            ws = ws and x == true and type(k) == 'string' and k:find('^%S+$') ~= nil
+            if not (nl or wl or ws) then break end
+        end
+        local w = {}
+        if c > 0 and c == n and nl then
+            for i = 1, n do w[i] = num(v[i]) end
+            out[#out+1] = 'N' .. string.format('%q', table.concat(w, ' '))
+        elseif c > 0 and c == n and wl then
+            out[#out+1] = 'L' .. string.format('%q', table.concat(v, ' '))
+        elseif c > 0 and ws then
+            for k in pairs(v) do w[#w+1] = k end
+            out[#out+1] = 'S' .. string.format('%q', table.concat(w, ' '))
+        else
+            out[#out+1] = '{'
+            for k, x in pairs(v) do
+                out[#out+1] = '['
+                dump(k, out)
+                out[#out+1] = ']='
+                dump(x, out)
+                out[#out+1] = ',\n'
+            end
+            out[#out+1] = '}'
+        end
+    end
+end
+
+--[[
+-- Save a checkpoint after action `a`: the run state into
+-- G.BASE/state.lua, then G.BASE copied to CKPT (replaced only
+-- once the copy is complete).
+-- Inputs:
+--  - a [integer]: last action done
+-- Outputs:
+--  - [number]: wall secs
+-- Callers:
+--  - main chunk [p2p.lua]: every G.CKPT_N actions
+--]]
+local function save (a)
+    local c0 = now()
+    local st = {
+        a = a, el = c0 - t0,
+        HOLD = HOLD, CNT = CNT, ACTIVE = ACTIVE,
+        HEAD = HEAD, SEEN = SEEN, MGONLY = MGONLY,
+        HEAP = HEAP, SEQ = SEQ, TIMER = TIMER, PEND = PEND,
+        TICK = TICK, SCHED = SCHED,
+        KEYOF = KEYOF, PLACE = PLACE, NAUTH = NAUTH, AUTH = AUTH,
+        STATS = STATS, POST = POST, FF = FF, MG = MG, BORN = BORN,
+        VIS = VIS, NC = NC, NB = NB, NA = NA, PT = PT, RX = RX,
+        TX = TX, TMAX = TMAX, RCN = RCN, CH = CH, CLA = CLA,
+        PCL = PCL, MXP = MXP, MXF = MXF, MXV = MXV, R = R,
+    }
+    local out = { 'return ' }
+    dump(st, out)
+    local f = assert(io.open(G.BASE .. '/state.lua', 'w'))
+    f:write(table.concat(out), '\n')
+    f:close()
+    exec("rm -rf " .. CKPT .. ".new && cp -a " .. G.BASE .. " " .. CKPT ..
+        ".new && rm -rf " .. CKPT .. " && mv " .. CKPT .. ".new " .. CKPT)
+    return now() - c0
+end
+
+--[[
+-- Load the run state saved by `save` (G.BASE is the restored copy).
+-- Inputs:
+--  - none
+-- Outputs:
+--  - [integer]: last action done
+-- Errors:
+--  - assert: no or bad state.lua
+-- Callers:
+--  - main chunk [p2p.lua]: RESUME=1
+--]]
+local function restore ()
+    local env = {
+        N = function (x)
+            local t = {}
+            for w in x:gmatch('%S+') do t[#t+1] = tonumber(w) end
+            return t
+        end,
+        L = function (x)
+            local t = {}
+            for w in x:gmatch('%S+') do t[#t+1] = w end
+            return t
+        end,
+        S = function (x)
+            local t = {}
+            for w in x:gmatch('%S+') do t[w] = true end
+            return t
+        end,
+    }
+    local st = assert(loadfile(G.BASE .. '/state.lua', 't', env))()
+    HOLD, CNT, ACTIVE = st.HOLD, st.CNT, st.ACTIVE
+    HEAD, SEEN, MGONLY = st.HEAD, st.SEEN, st.MGONLY
+    HEAP, SEQ, TIMER, PEND = st.HEAP, st.SEQ, st.TIMER, st.PEND
+    TICK, SCHED = st.TICK, st.SCHED
+    KEYOF, PLACE, NAUTH, AUTH = st.KEYOF, st.PLACE, st.NAUTH, st.AUTH
+    STATS, POST, FF, MG, BORN = st.STATS, st.POST, st.FF, st.MG, st.BORN
+    VIS, NC, NB, NA, PT = st.VIS, st.NC, st.NB, st.NA, st.PT
+    RX, TX, TMAX, RCN, CH = st.RX, st.TX, st.TMAX, st.RCN, st.CH
+    CLA, PCL, MXP, MXF, MXV = st.CLA, st.PCL, st.MXP, st.MXF, st.MXV
+    R = st.R
+    t0 = now() - st.el
+    return st.a
+end
+
+local A0 = 0                        -- last action done (resume)
+if G.RESUME then
+    A0 = restore()
+    math.randomseed(G.SEED, A0)
+    print(string.format("== resume at %d", A0))
+end
+
+for a = A0 + 1, NE do
+    local e = EVENTS[a]
     local ts = e[1]
     local ta, pa = now(), STATS.pulls
     local jf, jm = #FF + 1, #MG + 1
@@ -1096,7 +1269,7 @@ for a, e in ipairs(EVENTS) do
         exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
             root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. k)
         print(string.format("== %d kept %s", a, k))
-        if a % G.EV_N == 0 then
+        if G.EV_N > 0 and a % G.EV_N == 0 then
             os.execute(string.format("sh %s/ev/ev.sh %s-%dk %d > %s/logs/ev-%s-%dk.log 2>&1 &",
                 DIR, G.KEEP, a // 1000, ts + 3600, DIR, G.KEEP, a // 1000))
         end
@@ -1115,6 +1288,13 @@ for a, e in ipairs(EVENTS) do
             sp, STATS.pulls, nf, sf, nm, sm, STATS.idle,
             math.floor(wk), wk / el))
         print()
+    end
+    -- checkpoint (after sweep/keep), then reseed: math.random
+    -- state cannot be saved, so every run reseeds here
+    if G.CKPT_N > 0 and a % G.CKPT_N == 0 and a < NE then
+        print(string.format("== %d ckpt %.0fs  %s", a, save(a),
+            exec("du -sh " .. CKPT .. " | cut -f1")))
+        math.randomseed(G.SEED, a)
     end
 end
 
