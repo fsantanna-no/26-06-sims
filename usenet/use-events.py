@@ -17,6 +17,9 @@ Times (UTC, seconds):
     each batch (gaps < BATCH secs) is spread evenly over the
     gap before it, order kept, its last message keeps its
     stamp
+Authors (26/10/22): addresses lower-cased, `.uucp` stripped; a
+full name (2+ words) in the same domain is one author (see
+`domain`); user = the author's first address
 usage: use-events.py [mbox] [out-prefix]
 """
 
@@ -85,6 +88,50 @@ def stamp (date):
     return None, False
 
 
+def domain (addr):
+    """
+    The organization of an address (for author merges).
+    Inputs:
+     - addr [str]: normalized address (lower case, no `.uucp`)
+    Outputs:
+     - [str]: uucp path: host before the user; else the label
+       before the TLD (`xx.ac.uk`-like: +1; `*.oz.au`, `*.xx.us`:
+       one deeper)
+    Callers:
+     - author [use-events.py]
+    """
+    user, _, host = addr.rpartition('@')
+    if '!' in user:
+        return user.split('!')[-2]
+    p = host.split('.')
+    k = 2
+    if len(p) >= 3 and len(p[-1]) == 2 and \
+            p[-2] in ('co', 'ac', 'com', 'edu', 'org', 'net', 'oz'):
+        k = 3
+    if len(p) >= 4 and (p[-1] == 'us' or p[-2] == 'oz'):
+        k = 4
+    return '.'.join(p[-k:-1]) if len(p) >= k else host
+
+
+def author (frm):
+    """
+    A From header -> (merge key, normalized address).
+    Inputs:
+     - frm [str]: header value
+    Outputs:
+     - [tuple]: key (full name + domain, or the address for
+       1-word or no names), address
+    Callers:
+     - main [use-events.py]
+    """
+    name, addr = email.utils.parseaddr(frm)
+    addr = re.sub(r'\.uucp$', '', (addr or frm or 'anonymous').lower())
+    name = ' '.join(name.lower().split())
+    if len(name.split()) >= 2:
+        return (name, domain(addr)), addr
+    return ('@', addr), addr
+
+
 def main ():
     here = os.path.dirname(os.path.abspath(__file__))
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, '..', 'data', 'yyy.mbox')
@@ -92,7 +139,7 @@ def main ():
     bodies = out + '.bodies'
     os.makedirs(bodies, exist_ok=True)
     recs = records(src)
-    ev, days, nodate = [], {}, 0
+    ev, days, nodate, first = [], {}, 0, {}
     for i, (frm, subj, date, body) in enumerate(recs):
         ts, exact = stamp(date)
         if ts is None:
@@ -101,7 +148,8 @@ def main ():
         uid = 'u%d' % (i + 1)
         with open(os.path.join(bodies, uid), 'w') as f:
             f.write('From: %s\nSubject: %s\nDate: %s\n%s\n' % (frm, subj, date, body))
-        user = email.utils.parseaddr(frm)[1] or frm or 'anonymous'
+        key, addr = author(frm)
+        user = first.setdefault(key, addr)          # archive order
         e = [ts, i, uid, user]
         ev.append(e)
         if not exact:

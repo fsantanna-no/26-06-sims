@@ -1161,6 +1161,96 @@
                 - killed at 20896 (26/10/17, 39 h): low memory,
                   reaped by Claude Code; forks 70%, ff median 0.39;
                   kept 5k-20k; plan 261017-resume, then restart
+                - [x] r2 started 26/10/17 (user terminal, EV_N=0,
+                  ckpt every 5k): `logs/usenet-full-mix-churn-r2.log`
+                - r2 done 26/10/21 01:15 (88.5 h): PASS, 0 of 58
+                  peers differ, reps 0 mismatches
+                    - forks 66% (on 55%, ps 67%, lf 89%)
+                    - visibility median 29 h, p90 44 h, max 8.4 d
+                      (on 27.7 h, ps 29.8 h, lf 36.8 h)
+                    - pull median 0.47 s, p90 1.14, max 10.3;
+                      per commit 0.23 s; 1.18 GB in total
+                    - down S 1.0%, M 8.3%, L 5.0%; deferred
+                      106603, backup 30098, ring 991
+                    - s/action 5.5 (0-5k) -> 18.5 (33k)
+                    - kept 5k-30k + `r2-final` (copied after end)
+                - [ ] ev.sh on r2-final, 30k..5k (sequential,
+                  detached, started 26/10/21 08:42):
+                  `logs/ev-usenet-full-mix-churn-r2-*.log`
+                    - final: same order, clamps 31.0%
+                    - reboot (26/10/21-22) killed it in reorders.py
+                      (p00, 5.9 GB): reorders/blocked lost
+                - [ ] bytes per pull count commits only (`p2p.lua`
+                  240, objects of `ht..hn`): payloads go through
+                  `refs/payloads`, not counted; a post commit is
+                  510 B (empty tree), body median ~1.4 KB
+                    - fix: add the payload objects fetched per pull
+                    - r2 (no rerun): estimate from the corpus,
+                      bodies of each pull's commits
+                - blocked at 10k (killed run's copy, 379 s): W=0
+                  1.53%, W=500 1.45%, W=1000 0.10% (old paper
+                  3.5%); `ev/usenet-full-mix-churn-10k.blocked`
+                - blocked on r2-final (paper number, 1312 s): later
+                  posts 20547, W=0 1.24%, W=500 1.15%, W=1000
+                  0.08%; blocked reps -500 for 220 of 255; unknown
+                  1012 (3%, merge parent); file
+                  `ev/usenet-full-mix-churn-r2-final.blocked`
+                - half reward (+500, replay estimate at 10k, ref
+                  only): W=0 ~2.3%, W=500 ~1.7%
+            - [ ] usenet authors are addresses, not people (26/10/22):
+              12,539 addresses; merge rules agreed:
+                - always: lower-case, strip `.uucp` (12,334)
+                - full name (2+ words, `From:`) + same domain
+                - domain: uucp path -> host before the user;
+                  else label before the TLD; `xx.ac.uk`-like +1;
+                  `*.oz.au`, `*.xx.us` one deeper
+                - 1-word names never merge ("john", "chris")
+                - free-mail and role addresses merge by the rule
+                - result: 11,348 authors (use-events.py)
+                - paper: "33,814 posts from 11,348 authors"; r2
+                  kept as is (addresses = authors in the run)
+                - [x] apply in `usenet/use-events.py` (`author`,
+                  `domain`); dry run: same ts/ids, only users
+                - [x] regenerate `data/usenet.tsv` (keep the r2
+                  input as `data/usenet-r2.tsv`): same ts/ids
+                - 1255 posts stop being an author's first post
+                - blocked, merged authors (replay x measured, no
+                  rerun): W=0 ~1.0%, W=500 ~0.94%, W=1000 ~0.07%
+                  (replay r2 tick starts: addresses 1.39%, merged
+                  1.14% at W=500)
+                - [ ] optional: 5k run with merged authors (~8 h)
+                  to check forks unchanged
+            - r2 report for the paper (26/10/22): build ia-optim
+              ab304a9 (installed 15/10 16:08:55, files = worktree)
+                - storage S1: gc'd 154 MB; snapshots 96 MB, payloads
+                  ~35, commits 14, idx/refs ~26; no payloads
+                  115-119 MB (S/M/L); mbox 85 MB raw, 30 MB gzip
+                - paper: storage goes to the synthetic subsection
+                - [x] reorders: sample 400 of 6517 usable merges
+                  (full set ~7 d), seed 1, 8782 s, scratch copy
+                    - loser moves in 397 (99.3%), winner never
+                    - moved per merge: mean 2.5, median 1, p90 6,
+                      max 18 (1013 total)
+                    - 10.5% also reorder inside the loser
+                - [ ] check: ps and lf share per-commit/per-action
+                  costs (0.128/0.191 s): per-class accounting bug?
+                - [ ] check: visibility max 8.4 d > 7-day window,
+                  no hard fork: which post/peer
+                - deliveries 1,961,292 vs 33,814 x 58 (+80): minor
+                - always-on baseline: no full run on this build
+            - chat run (26/10/22): all on, CHURN=1, MERGES=1
+                - `config.lua`: CORPUS = 'chat'
+                - `p2p.lua`: bytes per pull + payloads; final
+                  keep `<KEEP>-final` (S1, L45, keys) at END
+                - [x] smoke 30 (26/10/22): PASS 86 s; forks 11
+                  of 30 (burst at the log start, 46 h); final
+                  keep ok; bytes median 533 (with payloads)
+                - visibility = slowest peer: under churn some
+                  peer is down (median 13 h in the smoke)
+                - posts ignore the author's leaf outage (posted
+                  offline, pushed at reconnect)
+                - [ ] running (26/10/22, pid 831322, detached): 5k,
+                  KEEP=chat-5k-on-churn, `logs/chat-5k-on-churn.log`
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)

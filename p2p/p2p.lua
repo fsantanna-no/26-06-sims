@@ -233,11 +233,13 @@ local function script (tasks)
         "  out=$(freechains --root=$T --now=$4 chain " .. G.ALIAS ..
             " sync recv $F" .. C .. " 2>&1); rc=$?",
         "  local t1=$(date +%s%N)",
-        -- received: commits, bytes of new objects (uncompressed);
+        -- received: commits, bytes of new objects (uncompressed)
+        -- + their payloads (refs/payloads/<cid>, not in ht..hn);
         -- --topo-order: merges are dated 0 (date walk errs)
         "  local hn=$(git -C $T" .. C .. " rev-parse HEAD)",
         "  local nc=$(git -C $T" .. C .. " rev-list --topo-order --count $ht..$hn)",
         "  local nb=$(git -C $T" .. C .. " rev-list --topo-order --objects $ht..$hn | cut -d' ' -f1 | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '{s+=$1} END {print s+0}')",
+        "  nb=$((nb+$(git -C $T" .. C .. " rev-list --no-merges $ht..$hn | sed 's|^|refs/payloads/|' | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '$2!=\"missing\" {s+=$1} END {print s+0}')))",
         "  local na=$(git -C $T" .. C .. " rev-list --topo-order --no-merges --count $ht..$hn)",
         "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na:$hf:$hn $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
         "}",
@@ -504,7 +506,9 @@ end
 local CKPT = G.BASE .. '.ckpt'
 if G.RESUME then
     -- peers as they were at the checkpoint (it stays intact)
-    exec("rm -rf " .. G.BASE .. " && cp -a " .. CKPT .. " " .. G.BASE)
+    -- (no process of the dead run may still write to G.BASE)
+    assert(os.execute("rm -rf " .. G.BASE .. " && cp -a " .. CKPT .. " " .. G.BASE),
+        "resume : cannot restore " .. CKPT)
 else
     os.execute("rm -rf " .. G.BASE)
     os.execute("mkdir -p " .. KEYS)
@@ -1426,3 +1430,11 @@ end
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, math.min(10, #keys)))
 print((bad_o == 0 and bad_r == 0 and norder == NE) and "== PASS" or "== FAIL")
+
+-- final copy of S1, L45, keys (also on FAIL)
+if G.KEEP then
+    local k = string.format("%s/.freechains-keep/%s-final", DIR, G.KEEP)
+    exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
+        root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. k)
+    print("== END kept " .. k)
+end
