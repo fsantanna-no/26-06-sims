@@ -694,10 +694,15 @@ end
 -- Outputs:
 --  - [function]: each call returns the next number
 -- Callers:
---  - main chunk [p2p.lua]: the outage schedule
+--  - main chunk [p2p.lua]: the outage schedule, DEFER placement
 --]]
 local function rng (seed)
-    local x = seed
+    -- splitmix64 scramble: close seeds gave equal first draws
+    local x = seed + 0x9E3779B97F4A7C15
+    x = (x ~ (x >> 30)) * 0xBF58476D1CE4E5B9
+    x = (x ~ (x >> 27)) * 0x94D049BB133111EB
+    x = x ~ (x >> 31)
+    if x == 0 then x = 1 end
     return function ()
         x = x ~ (x << 13)
         x = x ~ (x >> 7)
@@ -812,6 +817,31 @@ if G.CHURN then
             DOWN[p] = D
         end
     end
+end
+
+-- defer (DEFER=1): a down leaf cannot post; its posts move to
+-- its reconnect + 1 tick (after the reconnect pulls); authors are
+-- placed up front (own RNG, sticky, uniform on leaves)
+local DEFP = {}                     -- deferred posts: delay (secs)
+if G.CHURN and G.DEFER and G.MODE == 'corpus' then
+    local r = rng(G.CHURN.seed * 1000003 + N + 1)
+    for i, e in ipairs(EVENTS) do
+        if not PLACE[e[2]] then
+            PLACE[e[2]] = LEAF[1 + math.floor(r() * #LEAF)]
+        end
+        local l, t = PLACE[e[2]], e[1]
+        while not up(l, t) do
+            t = math.ceil(nextup(l, t)) + G.T.tick
+        end
+        if t > e[1] then
+            DEFP[#DEFP+1] = t - e[1]
+            e[1] = t
+        end
+        e[5] = i                    -- archive order (stable sort)
+    end
+    table.sort(EVENTS, function (x, y)
+        return x[1] < y[1] or (x[1] == y[1] and x[5] < y[5])
+    end)
 end
 
 --[[
@@ -1409,6 +1439,11 @@ if G.CHURN then
     print(string.format("== END churn: down %s  deferred=%d  backup=%d  ring=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
         table.concat(dt, ", "), CH.defer, CH.backup, CH.ring, CH.rc,
         r1, r2, r3))
+    if G.DEFER then
+        local d1, d2, d3 = q(DEFP)
+        print(string.format("== END churn posts: deferred=%d  delay median=%.0f p90=%.0f max=%.0f",
+            #DEFP, d1, d2, d3))
+    end
 end
 -- per pull: commits and bytes received; per peer: pulls by tier
 local c1, c2, c3 = q(NC)

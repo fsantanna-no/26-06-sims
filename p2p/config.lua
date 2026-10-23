@@ -13,7 +13,7 @@ local RL    = RELAY[KEY]
 
 -- env overrides (one run per command line, no file edits):
 -- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1, MERGES=1, MIX=1,
--- CHURN=1, EV_N=<n>, CKPT_N=<n>, RESUME=1, BASE=<dir>
+-- CHURN=1, DEFER=1, EV_N=<n>, CKPT_N=<n>, RESUME=1, BASE=<dir>
 local function env (k, v)
     return tonumber(os.getenv(k) or '') or v
 end
@@ -70,10 +70,14 @@ return {
         on = 0.95,          -- always-on mids and leaves
         mid = 0.90,         -- session mids (ps, lf)
         down = 3600,        -- median outage (secs)
-        alpha = 1.5,        -- Pareto shape (heavy tail)
+        alpha = 2.5,        -- Pareto shape (26/10/23: 1.5 -> 2.5)
         cap = 3 * 86400,    -- longest outage (secs)
         seed = 1,
     } or nil,
+    -- defer (26/10/23): a down leaf posts at its reconnect
+    -- (chat: no offline posts); needs CHURN; authors placed up
+    -- front, so the random sequence differs from DEFER=0
+    DEFER = (os.getenv('DEFER') == '1'),
     -- session phases on whole SLOT secs (shared dial-in times,
     -- so pulls share waves); 0 = any time
     SLOT  = 3600,

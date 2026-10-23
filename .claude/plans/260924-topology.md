@@ -1238,6 +1238,17 @@
                   no hard fork: which post/peer
                 - deliveries 1,961,292 vs 33,814 x 58 (+80): minor
                 - always-on baseline: no full run on this build
+                - reps at the end (S1 head snapshot, 26/10/23):
+                  12,539 members, total 28.8M; min 500 (pending
+                  refund), median 1000, mean 2294, p90 4000, max
+                  50,000 (cap)
+                    - post-only open chain: reps = 1000 per tick
+                      with a post; 94% of authors: 1000 per post
+                    - cap binds for 39 authors (52-355 posts);
+                      top 1% hold 16% of reps vs 26% of posts,
+                      top 10% 48% vs 55%
+                    - nobody starves: every author >= 500 (one
+                      post); blocked posts = bursts in one tick
             - chat run (26/10/22): all on, CHURN=1, MERGES=1
                 - `config.lua`: CORPUS = 'chat'
                 - `p2p.lua`: bytes per pull + payloads; final
@@ -1249,8 +1260,46 @@
                   peer is down (median 13 h in the smoke)
                 - posts ignore the author's leaf outage (posted
                   offline, pushed at reconnect)
-                - [ ] running (26/10/22, pid 831322, detached): 5k,
-                  KEEP=chat-5k-on-churn, `logs/chat-5k-on-churn.log`
+                - [x] chat 5k on churn: PASS (26/10/23 01:39),
+                  16,423 s (4.6 h), 08/2010-09/2010; keeps
+                  `chat-5k-on-churn-{5k,final}`
+                    - forks 2307 (46%), merges 750; visibility
+                      median 3.3 h, p90 2.8 d, max 3.0 d
+                    - pull median 0.22 s, p90 0.31, max 42 s;
+                      commits max 1458 (reconnect); bytes median
+                      560, total 173 MB (with payloads)
+                    - churn down S 1.0 / M 5.4 / L 5.4%; deferred
+                      16,243; backup 370; reconnect 460
+                    - served per pull: S 8.2k, M 18.3k, L 5
+                    - forks: one run of 1049 consecutive forks,
+                      miss 8-9 (925 posts): posts held by a down
+                      peer for days fork every later post
+                    - cause: L45 down 72 h (the cap) from
+                      09-23 15:23; its authors posted 9 times
+                      (3215-3237, 3519); reconnect falls in a
+                      chat gap (09-25 21:20 - 09-27 18:54), seen
+                      at 4264 (58 s, pull 42 s)
+                - [x] decided (26/10/23): defer a down leaf's
+                  posts to its reconnect (DEFER=1)
+                    - `config.lua`: DEFER env; `p2p.lua` ~817:
+                      authors placed up front (own RNG), posts
+                      moved to reconnect + 1 tick, stable re-sort;
+                      END `churn posts: deferred, delay`
+                    - smoke 30: PASS, forks 0 (was 11), 6 posts
+                      deferred (median 43 min, max 3.7 h)
+                - why 3 days: Pareto xm 38 min, shape 1.5; per
+                  leaf ~24 outages in 36 d; over 45 leaves expect
+                  ~37 > 6 h, ~5 > 1 d, ~1 at the 72 h cap
+                - stopped at 207 (26/10/23): chat 5k DEFER=1,
+                  `logs/chat-5k-on-churn-defer-stopped.log`
+                - [x] bug: `rng()` close seeds gave equal first
+                  draws (0.000059): every peer's first outage at
+                  t0 + 7 s (r2 too: first hours only); fix:
+                  splitmix64 seed scramble (`p2p.lua` rng)
+                - fixed schedule, chat 5k leaves: alpha 1.5: 8 >
+                  1 d, 3 at the 72 h cap, worst leaf 12.4%; alpha
+                  2.5: 0 > 1 d, longest 19 h, worst leaf 7.3%
+                - [ ] decide alpha (1.5 or 2.5), then restart
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
