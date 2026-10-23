@@ -1249,6 +1249,20 @@
                       top 10% 48% vs 55%
                     - nobody starves: every author >= 500 (one
                       post); blocked posts = bursts in one tick
+                - `p2p/ev/reps-authors.tsv` (26/10/23, for the
+                  paper session's §4.1 figure): address, posts,
+                  posting_days, reps; 12,539 rows
+                    - posting_days: replay of the tick rules over
+                      the final order (scratch `reps_replay.py`);
+                      matches the run: 0 credit, 0 reps mismatches
+                    - reps = 1000 x days for all uncapped but one
+                      (genew@telus.net, 500: open tick)
+                    - Lorenz (by reps; ties in file order) top
+                      1/5/10/25/50%: reps 16.0/36.2/47.5/64.5/78.2,
+                      posts 25.4/44.1/54.3/69.3/81.2
+                    - merged (11,348, estimate on the same ticks):
+                      reps 15.9/37.5/49.3/66.3/80.0, posts
+                      26.3/46.1/56.4/71.2/82.9; 43 at cap
             - chat run (26/10/22): all on, CHURN=1, MERGES=1
                 - `config.lua`: CORPUS = 'chat'
                 - `p2p.lua`: bytes per pull + payloads; final
