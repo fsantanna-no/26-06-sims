@@ -13,7 +13,8 @@ local RL    = RELAY[KEY]
 
 -- env overrides (one run per command line, no file edits):
 -- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1, MERGES=1, MIX=1,
--- CHURN=1, DEFER=1, EV_N=<n>, CKPT_N=<n>, RESUME=1, BASE=<dir>
+-- CHURN=1, DEFER=1, EV_N=<n>, KEEP_N=<n>, CKPT_N=<n>, RESUME=1,
+-- BASE=<dir>
 local function env (k, v)
     return tonumber(os.getenv(k) or '') or v
 end
@@ -88,7 +89,7 @@ return {
     -- <run>-<a>; ev/ev.sh runs on every EV_N copy (background;
     -- 0: off, run it on the kept copies after: ~2.5 GB at 20k)
     KEEP   = os.getenv('KEEP'),
-    KEEP_N = 5000,
+    KEEP_N = env('KEEP_N', 5000), -- also the report period
     EV_N   = env('EV_N', 10000),
     -- checkpoint every CKPT_N actions (0: off): the run state
     -- (`state.lua`) and a copy of BASE at <BASE>.ckpt; the RNG

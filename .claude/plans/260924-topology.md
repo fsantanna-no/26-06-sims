@@ -1313,7 +1313,44 @@
                 - fixed schedule, chat 5k leaves: alpha 1.5: 8 >
                   1 d, 3 at the 72 h cap, worst leaf 12.4%; alpha
                   2.5: 0 > 1 d, longest 19 h, worst leaf 7.3%
-                - [ ] decide alpha (1.5 or 2.5), then restart
+                - [x] decide alpha: 2.5 (user), restarted
+                - [x] chat 5k DEFER=1, alpha 2.5: PASS (26/10/23
+                  ~11:40), 15,106 s, log
+                  `chat-5k-on-churn-defer.log`, keep
+                  `chat-5k-on-churn-defer-final`
+                    - forks 993 (19%, was 46%), merges 568 (was 750)
+                    - visibility median 1.3 h, p90 7.4 h, max 15 h
+                      (was 3.3 h / 2.8 d / 3.0 d)
+                    - 272 posts deferred: delay median 54 min, p90
+                      5.8 h, max 15 h
+                    - down S 1.0 / M 5.6 / L 5.4%; 0 order diffs
+                    - leftover forks: leaf up but its mid down, no
+                      backup (L27 at 1014-1084: 71 forks)
+                - [x] decided (user): DEFER also when the leaf is
+                  alone (its primary and backup mids down); a mid
+                  cut from supers still serves its leaves: no defer
+                    - `p2p.lua` `alone()`, DEFER loop
+                    - smoke 30: PASS, forks 0, 3 posts deferred
+                - [x] rerun chat 5k DEFER=1 (alone): PASS
+                  (26/10/23 ~18:00), 15,103 s, log
+                  `chat-5k-on-churn-defer2.log`, keep
+                  `chat-5k-on-churn-defer2-{5k,final}`
+                    - forks 601 (12%, was 19% / 46%), merges 562
+                    - visibility median 1.2 h, p90 7.4 h, max 15 h
+                      (unchanged: readers' outages)
+                    - 404 posts deferred (was 272): delay median
+                      52 min, p90 7.2 h, max 15 h
+                    - 0 order diffs; pulls, bytes as before
+            - full chat run (155,528 posts, ~3-4 weeks est.):
+              stoppable anytime
+                - [x] `report()`: END summary also every KEEP_N
+                  (`== <a> report ...`), no order check mid-run
+                - [x] `config.lua`: KEEP_N env (default 5000)
+                - [x] smoke 30, KEEP_N=10: PASS, END unchanged
+                - [ ] running (26/10/25 10:53, PID 3888325):
+                  KEEP=chat-full-on-churn-defer LIMIT=155528
+                  MERGES=1 CHURN=1 DEFER=1 EV_N=0, log
+                  `logs/chat-full-on-churn-defer.log`
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)

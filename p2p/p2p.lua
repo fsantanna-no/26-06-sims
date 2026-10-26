@@ -452,6 +452,7 @@ end
 --  - [number]: the sum (s)
 -- Callers:
 --  - main chunk [p2p.lua]: the "work" of a report
+--  - report [p2p.lua]: totals
 --]]
 local function sum (xs)
     local s = 0
@@ -468,7 +469,7 @@ end
 -- Outputs:
 --  - [number]: median, p90, max (0 when empty)
 -- Callers:
---  - main chunk [p2p.lua]: the END report
+--  - report [p2p.lua]: the summary
 --]]
 local function q (xs)
     local ys = table.move(xs, 1, #xs, 1, {})
@@ -819,10 +820,32 @@ if G.CHURN then
     end
 end
 
--- defer (DEFER=1): a down leaf cannot post; its posts move to
--- its reconnect + 1 tick (after the reconnect pulls); authors are
--- placed up front (own RNG, sticky, uniform on leaves)
-local DEFP = {}                     -- deferred posts: delay (secs)
+--[[
+-- When a leaf has a way out: it is up and its primary or backup
+-- mid is up.
+-- Inputs:
+--  - l [integer]: leaf id
+--  - t [number]: chain time
+-- Outputs:
+--  - [number|nil]: nil with a way out, else the next time to try
+-- Callers:
+--  - main chunk [p2p.lua]: DEFER placement
+--]]
+local function alone (l, t)
+    if not up(l, t) then
+        return nextup(l, t)
+    end
+    local m, b = UP[l], BK[l]
+    if up(m, t) or (b and up(b, t)) then
+        return nil
+    end
+    return b and math.min(nextup(m, t), nextup(b, t)) or nextup(m, t)
+end
+
+-- defer (DEFER=1): a leaf alone (down, or all its mids down)
+-- cannot post; its posts move to its way out + 1 tick (after the
+-- reconnect pulls); authors are placed up front (own RNG, sticky,
+-- uniform on leaves)
 if G.CHURN and G.DEFER and G.MODE == 'corpus' then
     local r = rng(G.CHURN.seed * 1000003 + N + 1)
     for i, e in ipairs(EVENTS) do
@@ -830,11 +853,13 @@ if G.CHURN and G.DEFER and G.MODE == 'corpus' then
             PLACE[e[2]] = LEAF[1 + math.floor(r() * #LEAF)]
         end
         local l, t = PLACE[e[2]], e[1]
-        while not up(l, t) do
-            t = math.ceil(nextup(l, t)) + G.T.tick
+        while true do
+            local s = alone(l, t)
+            if not s then break end
+            t = math.ceil(s) + G.T.tick
         end
         if t > e[1] then
-            DEFP[#DEFP+1] = t - e[1]
+            e.dly = t - e[1]         -- deferred: delay (secs)
             e[1] = t
         end
         e[5] = i                    -- archive order (stable sort)
@@ -1238,6 +1263,119 @@ local function restore ()
     return st.a
 end
 
+--[[
+-- Print the run summary so far (no order/reps check).
+-- Inputs:
+--  - pre [string]: line prefix ("== END", "== 5000 report")
+--  - na  [integer]: actions done
+-- Outputs:
+--  - none (prints)
+-- Callers:
+--  - main loop [p2p.lua]: every KEEP_N actions
+--  - main chunk [p2p.lua]: END
+--]]
+local function report (pre, na)
+    local tn = EVENTS[na][1]        -- chain time of the last action
+    local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
+    print(string.format("%s forks=%d of %d actions (%d%%)  merges in DAG=%d",
+        pre, STATS.forks, na, 100*STATS.forks//na, merges))
+    print(string.format("%s pulls dropped (nothing new)=%d  merge-only=%d",
+        pre, STATS.noop, MGONLY))
+    local v1, v2, v3 = q(VIS)
+    print(string.format("%s visibility (post -> all peers) secs: median=%.0f p90=%.0f max=%.0f  posts=%d",
+        pre, v1, v2, v3, #VIS))
+    local w1, _, w3 = q(R)
+    print(string.format("%s actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
+        pre, na, w1, w3, STATS.pulls,
+        STATS.waves, STATS.wall, STATS.idle, now() - t0))
+    -- per pull: time, commits and actions received; time per
+    -- received commit and per received action (totals, and the
+    -- median of the per-pull ratios)
+    local p1, p2, p3 = q(PT)
+    local a1, a2, a3 = q(NA)
+    local tc, ta = {}, {}
+    for i = 1, #PT do
+        if NC[i] > 0 then tc[#tc+1] = PT[i] / NC[i] end
+        if NA[i] > 0 then ta[#ta+1] = PT[i] / NA[i] end
+    end
+    local st, sc, sa = sum(PT), sum(NC), sum(NA)
+    print(string.format("%s per pull: time median=%.2f p90=%.2f max=%.2f mean=%.2f  actions median=%d p90=%d max=%d",
+        pre, p1, p2, p3, st / math.max(1, #PT), a1, a2, a3))
+    print(string.format("%s per commit: %.3fs (total %.0fs / %d commits, median of pulls %.3f)  per action: %.3fs (%d actions, median %.3f)  commits per action %.2f",
+        pre, st / math.max(1, sc), st, sc, (q(tc)), st / math.max(1, sa), sa, (q(ta)), sc / math.max(1, sa)))
+    -- MIX, per class (author's leaf; pulls by receiver): forks,
+    -- visibility, time per pull, per received commit and action
+    if G.MIX then
+        for _, c in ipairs({ 'on', 'ps', 'lf' }) do
+            local n, st, sc, sa = 0, 0, 0, 0
+            for i = 1, #PT do
+                if PCL[i] == c then
+                    n, st = n + 1, st + PT[i]
+                    sc, sa = sc + NC[i], sa + NA[i]
+                end
+            end
+            local v1, v2, v3 = q(MXV[c] or {})
+            print(string.format("%s class %s: forks=%d of %d (%d%%)  visibility median=%.0f p90=%.0f max=%.0f  pulls=%d  per pull %.2fs  per commit %.3fs  per action %.3fs",
+                pre, c, MXF[c] or 0, MXP[c] or 0,
+                100 * (MXF[c] or 0) // math.max(1, MXP[c] or 0), v1, v2, v3,
+                n, st / math.max(1, n), st / math.max(1, sc),
+                st / math.max(1, sa)))
+        end
+    end
+    -- churn: realized downtime per tier, rerouted, deferred and
+    -- reconnect pulls (commits caught up per reconnect pull)
+    if G.CHURN then
+        local span = tn - EVENTS[1][1]
+        local dt = {}
+        for _, t in ipairs({ 'S', 'M', 'L' }) do
+            local s, n = 0, 0
+            for p = 0, N-1 do
+                if TIER[p] == t and DOWN[p] then
+                    n = n + 1
+                    for _, o in ipairs(DOWN[p]) do
+                        if o[1] < tn then
+                            s = s + math.min(o[2], tn) - o[1]
+                        end
+                    end
+                end
+            end
+            dt[#dt+1] = string.format("%s %.1f%% (%d peers)", t,
+                100 * s / math.max(1, n * span), n)
+        end
+        local r1, r2, r3 = q(RCN)
+        print(string.format("%s churn: down %s  deferred=%d  backup=%d  ring=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
+            pre, table.concat(dt, ", "), CH.defer, CH.backup, CH.ring,
+            CH.rc, r1, r2, r3))
+        if G.DEFER then
+            -- deferred posts among the actions done
+            local d = {}
+            for i = 1, na do
+                if EVENTS[i].dly then d[#d+1] = EVENTS[i].dly end
+            end
+            local d1, d2, d3 = q(d)
+            print(string.format("%s churn posts: deferred=%d  delay median=%.0f p90=%.0f max=%.0f",
+                pre, #d, d1, d2, d3))
+        end
+    end
+    -- per pull: commits and bytes received; per peer: pulls by tier
+    local c1, c2, c3 = q(NC)
+    local b1, b2, b3 = q(NB)
+    print(string.format("%s per pull: commits median=%d p90=%d max=%d  bytes median=%d p90=%d max=%d  total=%.1fMB",
+        pre, c1, c2, c3, b1, b2, b3, sum(NB) / 1e6))
+    for _, t in ipairs({ 'S', 'M', 'L' }) do
+        local rx, tx = {}, {}
+        for p = 0, N-1 do
+            if TIER[p] == t then
+                rx[#rx+1], tx[#tx+1] = RX[p] or 0, TX[p] or 0
+            end
+        end
+        local r1, _, r3 = q(rx)
+        local t1, _, t3 = q(tx)
+        print(string.format("%s pulls per %s peer: received median=%d max=%d  served median=%d max=%d",
+            pre, t, r1, r3, t1, t3))
+    end
+end
+
 local A0 = 0                        -- last action done (resume)
 if G.RESUME then
     A0 = restore()
@@ -1308,6 +1446,9 @@ for a = A0 + 1, NE do
                 DIR, G.KEEP, a // 1000, ts + 3600, DIR, G.KEEP, a // 1000))
         end
     end
+    if a % G.KEEP_N == 0 and a < NE then
+        report(string.format("== %d report", a), a)
+    end
     if a % 10 == 0 then
         local _,  sp = mma(POST, 1)
         local nf, sf = mma(FF, 1)
@@ -1336,15 +1477,6 @@ end
 local dw = advance(math.huge)
 assert(next(ACTIVE) == nil, "drain : actions not everywhere")
 print(string.format("== END drain waves=%d", dw))
-local merges = tonumber(exec("git -C " .. dir(0) .. " rev-list --merges --count HEAD"))
-print(string.format("== END forks=%d of %d actions (%d%%)  merges in DAG=%d",
-    STATS.forks, NE, 100*STATS.forks//NE, merges))
-print(string.format("== END pulls dropped (nothing new)=%d  merge-only=%d",
-    STATS.noop, MGONLY))
-table.sort(VIS)
-print(string.format("== END visibility (post -> all peers) secs: median=%.0f p90=%.0f max=%.0f",
-    VIS[(#VIS + 1) // 2] or 0, VIS[math.ceil(#VIS * 0.9)] or 0, VIS[#VIS] or 0))
-
 -------------------------------------------------------------------------------
 -- check: one `list order`, one `reps` per author, on every peer
 -- at chain time (last action + relay): the wall clock would fold
@@ -1375,93 +1507,8 @@ table.sort(keys)
 for i = 1, math.min(10, #keys) do
     bad_r = bad_r + same("reps member " .. keys[i] .. ".pub")
 end
-table.sort(R)
-print(string.format("== END actions=%d  waves per action median=%d max=%d  pulls=%d  waves=%d wave-wall=%.0fs  idle=%d  elapsed=%.0fs",
-    NE, R[(#R+1)//2], R[#R], STATS.pulls,
-    STATS.waves, STATS.wall, STATS.idle, now() - t0))
--- per pull: time, commits and actions received; time per
--- received commit and per received action (totals, and the
--- median of the per-pull ratios)
-do
-    local p1, p2, p3 = q(PT)
-    local a1, a2, a3 = q(NA)
-    local tc, ta = {}, {}
-    for i = 1, #PT do
-        if NC[i] > 0 then tc[#tc+1] = PT[i] / NC[i] end
-        if NA[i] > 0 then ta[#ta+1] = PT[i] / NA[i] end
-    end
-    local st, sc, sa = sum(PT), sum(NC), sum(NA)
-    print(string.format("== END per pull: time median=%.2f p90=%.2f max=%.2f mean=%.2f  actions median=%d p90=%d max=%d",
-        p1, p2, p3, st / math.max(1, #PT), a1, a2, a3))
-    print(string.format("== END per commit: %.3fs (total %.0fs / %d commits, median of pulls %.3f)  per action: %.3fs (%d actions, median %.3f)  commits per action %.2f",
-        st / math.max(1, sc), st, sc, (q(tc)), st / math.max(1, sa), sa, (q(ta)), sc / math.max(1, sa)))
-end
--- MIX, per class (author's leaf; pulls by receiver): forks,
--- visibility, time per pull, per received commit and action
-if G.MIX then
-    for _, c in ipairs({ 'on', 'ps', 'lf' }) do
-        local n, st, sc, sa = 0, 0, 0, 0
-        for i = 1, #PT do
-            if PCL[i] == c then
-                n, st = n + 1, st + PT[i]
-                sc, sa = sc + NC[i], sa + NA[i]
-            end
-        end
-        local v1, v2, v3 = q(MXV[c] or {})
-        print(string.format("== END class %s: forks=%d of %d (%d%%)  visibility median=%.0f p90=%.0f max=%.0f  pulls=%d  per pull %.2fs  per commit %.3fs  per action %.3fs",
-            c, MXF[c] or 0, MXP[c] or 0,
-            100 * (MXF[c] or 0) // math.max(1, MXP[c] or 0), v1, v2, v3,
-            n, st / math.max(1, n), st / math.max(1, sc),
-            st / math.max(1, sa)))
-    end
-end
--- churn: realized downtime per tier, rerouted, deferred and
--- reconnect pulls (commits caught up per reconnect pull)
-if G.CHURN then
-    local span = EVENTS[NE][1] - EVENTS[1][1]
-    local dt = {}
-    for _, t in ipairs({ 'S', 'M', 'L' }) do
-        local s, n = 0, 0
-        for p = 0, N-1 do
-            if TIER[p] == t and DOWN[p] then
-                n = n + 1
-                for _, o in ipairs(DOWN[p]) do
-                    if o[1] < EVENTS[NE][1] then
-                        s = s + math.min(o[2], EVENTS[NE][1]) - o[1]
-                    end
-                end
-            end
-        end
-        dt[#dt+1] = string.format("%s %.1f%% (%d peers)", t,
-            100 * s / math.max(1, n * span), n)
-    end
-    local r1, r2, r3 = q(RCN)
-    print(string.format("== END churn: down %s  deferred=%d  backup=%d  ring=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
-        table.concat(dt, ", "), CH.defer, CH.backup, CH.ring, CH.rc,
-        r1, r2, r3))
-    if G.DEFER then
-        local d1, d2, d3 = q(DEFP)
-        print(string.format("== END churn posts: deferred=%d  delay median=%.0f p90=%.0f max=%.0f",
-            #DEFP, d1, d2, d3))
-    end
-end
--- per pull: commits and bytes received; per peer: pulls by tier
-local c1, c2, c3 = q(NC)
-local b1, b2, b3 = q(NB)
-print(string.format("== END per pull: commits median=%d p90=%d max=%d  bytes median=%d p90=%d max=%d  total=%.1fMB",
-    c1, c2, c3, b1, b2, b3, sum(NB) / 1e6))
-for _, t in ipairs({ 'S', 'M', 'L' }) do
-    local rx, tx = {}, {}
-    for p = 0, N-1 do
-        if TIER[p] == t then
-            rx[#rx+1], tx[#tx+1] = RX[p] or 0, TX[p] or 0
-        end
-    end
-    local r1, _, r3 = q(rx)
-    local t1, _, t3 = q(tx)
-    print(string.format("== END pulls per %s peer: received median=%d max=%d  served median=%d max=%d",
-        t, r1, r3, t1, t3))
-end
+report("== END", NE)
+
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, math.min(10, #keys)))
 print((bad_o == 0 and bad_r == 0 and norder == NE) and "== PASS" or "== FAIL")
