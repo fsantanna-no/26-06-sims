@@ -677,9 +677,12 @@ end
 
 local DOWN = {}                     -- peer -> { {s, e}, ... } in order
 local BK, RING = {}, {}             -- leaf -> backup mid; mid -> ring mids
+local BKOF = {}                     -- mid -> leaves it backs up
 for _, e in ipairs(BKUP) do
     if e[3] == 'LX' then
         BK[e[1]] = e[2]
+        BKOF[e[2]] = BKOF[e[2]] or {}
+        table.insert(BKOF[e[2]], e[1])
     else
         RING[e[1]] = RING[e[1]] or {}
         RING[e[2]] = RING[e[2]] or {}
@@ -944,7 +947,8 @@ end
 --[[
 -- Move the fires due before a chain time into PEND (as pulls).
 -- A fired peer's neighbours pull from it, in order; over a
--- scheduled link the pull waits for the link's next session.
+-- scheduled link the pull waits for the link's next session; a
+-- backup mid also feeds its leaves whose primary mid is down.
 -- Inputs:
 --  - lim [number]: fires strictly before `lim`
 -- Outputs:
@@ -970,6 +974,13 @@ local function due (lim)
                 elseif not SCHED[p .. ':' .. q] then
                     SCHED[p .. ':' .. q] = true
                     hpush(s, p, q)
+                end
+            end
+            -- churn: a backup mid also relays to its leaves whose
+            -- primary mid is down (always-on links only)
+            for _, l in ipairs(G.CHURN and BKOF[p] or {}) do
+                if not up(UP[l], t) and not session(UP[l], l, t) then
+                    PEND[#PEND+1] = { l, p, t }
                 end
             end
         end

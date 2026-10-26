@@ -1232,6 +1232,24 @@
                     - moved per merge: mean 2.5, median 1, p90 6,
                       max 18 (1013 total)
                     - 10.5% also reorder inside the loser
+                - [ ] reorders over all 6517 (paper request):
+                  running (26/10/26, PID 387168, ~40 h), scratch
+                  `tmp.0d3XDgzgwI/p00.reorders-all`
+                    - L45 won't do: same DAG, same answer; only 41
+                      extra merges
+                    - slow: 125 merges in 3.9 h (newest first,
+                      shares the machine with the chat run): 2-4 d
+                - [x] storage breakdown (paper request, 26/10/26):
+                  sent; r2 S1 as kept: disk 142 MB, payloads 32,
+                  commits 14, snapshots 96 (68%), 4.4x; gc'd L45:
+                  122 MB objects, du 157 MB (= paper's 154: du of
+                  gc'd repo, incl. idx 14 + packed-refs 7); chat
+                  5k: 6.4 MB, 21x; chat 20k: 28 MB, 28x
+                    - script `scratchpad/storage.sh`
+                - [x] merges (paper request): 16,276, all with 2
+                  parents; commits per side since merge base:
+                  long 4/16/90, short 1/2/11, both 5/17/91
+                  (median/p90/max)
                 - [ ] check: ps and lf share per-commit/per-action
                   costs (0.128/0.191 s): per-class accounting bug?
                 - [ ] check: visibility max 8.4 d > 7-day window,
