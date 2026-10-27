@@ -1246,6 +1246,18 @@
                   gc'd repo, incl. idx 14 + packed-refs 7); chat
                   5k: 6.4 MB, 21x; chat 20k: 28 MB, 28x
                     - script `scratchpad/storage.sh`
+                - [x] common rows (paper request, 26/10/26): sent
+                    - post time r2 0.09/0.13/0.42, chat 5k
+                      0.08/0.11/0.20 (median/p90/max)
+                    - r2 per 5k: ff mean 0.26 -> 1.04 s, max 1.9
+                      -> 10.3 s (exact mean/max; no per-slice
+                      median, commits, bytes in the r2 log)
+                    - gc'd chat = as kept (swept every 500)
+                    - voided per merge: not counted by the driver
+                - [ ] gc'd storage per r2 keep (5k..30k, final):
+                  after the reorders run
+                - [ ] r2 had the backup bug too (30,098 backup
+                  routes): rerun (~88 h)?
                 - [x] merges (paper request): 16,276, all with 2
                   parents; commits per side since merge base:
                   long 4/16/90, short 1/2/11, both 5/17/91
@@ -1365,10 +1377,25 @@
                   (`== <a> report ...`), no order check mid-run
                 - [x] `config.lua`: KEEP_N env (default 5000)
                 - [x] smoke 30, KEEP_N=10: PASS, END unchanged
-                - [ ] running (26/10/25 10:53, PID 3888325):
-                  KEEP=chat-full-on-churn-defer LIMIT=155528
-                  MERGES=1 CHURN=1 DEFER=1 EV_N=0, log
-                  `logs/chat-full-on-churn-defer.log`
+                - [x] 1st full run stopped at 24,643 (26/10/26):
+                  log `logs/chat-full-on-churn-defer-stopped.log`,
+                  keeps `chat-full-on-churn-defer-{5..20}k`
+                    - forks 13% to 20k, then 241 and 370 per 1000
+                      (busy 2011-02-08, 1860 posts in ~11 h)
+                    - bug: M2 down, L18 on backup M7: its posts
+                      went up, nothing came down (backup mid
+                      relayed to primary links only); L18 miss
+                      0 -> 266, one fork per post; reset when M2
+                      back; 5k runs had it too (backup=307)
+                - [x] fix: a backup mid also relays to its leaves
+                  whose primary mid is down (`p2p.lua` due, BKOF)
+                    - smoke 30: PASS, forks 0, backup 7 -> 29
+                - [ ] running (26/10/26 20:30, PID 1286227):
+                  KEEP=chat-full-bk LIMIT=155528 MERGES=1
+                  CHURN=1 DEFER=1 EV_N=0, log
+                  `logs/chat-full-bk.log`
+                - [ ] the 5k runs had the bug: rerun 5k? (or use
+                  the 5k report of the new full run)
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
