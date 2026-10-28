@@ -1,6 +1,7 @@
 # Reorders per merge (paper 3.6), post hoc on a COPY of a kept peer
 # (moves its `main` and restores it).
-# usage: reorders.py <peer root> <n (0 = all)> <seed> <now>
+# usage: reorders.py <peer root> <n (0 = all)> <seed> <now> [done]
+# done: an earlier output; its merges are skipped (resume)
 # callers: ev.sh
 # for merge M with parents p1, p2: list order at M, p1, p2;
 # reorders(p) = actions of order(p) outside its longest common
@@ -20,12 +21,18 @@ import atexit
 atexit.register(lambda: git("update-ref", "refs/heads/main", head))
 random.seed(seed)
 sample = merges if n <= 0 else random.sample(merges, min(n, len(merges)))
-cache = {}
+if len(sys.argv) > 5:
+    done = set(l.split()[0] for l in open(sys.argv[5]) if l[0] not in "#m")
+    sample = [m for m in sample if m[:8] not in done]
+    print(f"# resume: {len(done)} done, {len(sample)} left", flush=True)
+cache = {}                          # last few orders (bounded)
 def order (c):
     if c not in cache:
         git("update-ref", "refs/heads/main", c)
         out = subprocess.run(["freechains", "--root=" + root, "--now=" + now, "chain", "/usenet", "list", "order"], capture_output=True, text=True, check=True).stdout
         cache[c] = out.split()
+        if len(cache) > 8:
+            del cache[next(iter(cache))]
     return cache[c]
 def pushed (om, op):
     # actions of op outside its longest common prefix with om:
