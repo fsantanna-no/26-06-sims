@@ -1396,6 +1396,18 @@
                   `logs/chat-full-bk.log`
                 - [ ] the 5k runs had the bug: rerun 5k? (or use
                   the 5k report of the new full run)
+                - [x] new chat full: forks 10% at 5k and 10k (was
+                  12%, 13%): backup fix works
+            - solo timings (paper request, user ok 26/10/28)
+                - [x] SOLO=100: every 100 posts, the post in its
+                  own wave; then a noop pull alone at S1, L45 (only
+                  when nothing is new); per pull: wave width, kind
+                - [x] report: post in-wave vs solo, noop S1/L45,
+                  ff/mg all vs width 1 (slice and all)
+                - [x] smoke 30 (SOLO=10): PASS, results identical
+                  to the run without solo
+                - [ ] usenet rerun with the freechains refs fix:
+                  after the chat full run (user: wait)
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)

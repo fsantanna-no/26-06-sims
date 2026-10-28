@@ -322,6 +322,9 @@ local RCN = {}                      -- churn: commits per reconnect pull
 local CH = { defer=0, backup=0, ring=0, rc=0 }   -- churn: pull counts
 local CLA, PCL = {}, {}             -- MIX: class per action, per pull
 local MXP, MXF, MXV = {}, {}, {}    -- MIX: posts, forks, visibility per class
+local PW, PK = {}, {}               -- per pull: wave width, kind (ff, mg)
+local SOLOP, NOOP = {}, {}          -- solo: post times; noop pull times per peer
+local MK = { post=0, solo=0, n0=0, n1=0, pt=0 }  -- report: slice starts
 
 --[[
 -- Run one wave: the tasks, one per lane, in parallel.
@@ -388,6 +391,7 @@ local function wave (tasks, ts, act)
             NC[#NC+1], NB[#NB+1], NA[#NA+1] = tonumber(nc), tonumber(nb), tonumber(na)
             PT[#PT+1] = tonumber(ns) / 1e9
             PCL[#PT] = CLASS[to]
+            PW[#PT], PK[#PT] = #tasks, k
             if tasks[i][5] == 'rc' then
                 CH.rc = CH.rc + 1
                 RCN[#RCN+1] = tonumber(nc)
@@ -994,16 +998,19 @@ end
 -- or touched by an earlier waiting pull (keeps the order).
 -- A pull with nothing new is dropped.
 -- Receivers gain, so they arm their timers (at the pull's time).
+-- Solo: the post runs in a wave of its own, then its pulls (the
+-- pulls never touch the poster: same outcome).
 -- Inputs:
 --  - first [table]: tasks that go first (may be empty)
 --  - ts    [integer]: chain time of the wave
 --  - act   [integer]: id of a posted action (nil if no post)
+--  - solo  [boolean|nil]: split the post from its pulls
 -- Outputs:
 --  - [boolean]: a wave ran
 -- Callers:
 --  - advance, main chunk [p2p.lua]
 --]]
-local function step (first, ts, act)
+local function step (first, ts, act, solo)
     local W, R, WD, RD, tasks, rest = {}, {}, {}, {}, {}, {}
     for _, t in ipairs(first) do
         tasks[#tasks+1] = t
@@ -1034,7 +1041,15 @@ local function step (first, ts, act)
     if #tasks == 0 then
         return false
     end
-    wave(tasks, ts, act)
+    if solo and tasks[1][1] == 'post' then
+        wave({ tasks[1] }, ts, act)
+        SOLOP[#SOLOP+1] = table.remove(POST)
+        if #tasks > 1 then
+            wave(table.move(tasks, 2, #tasks, 1, {}), ts, nil)
+        end
+    else
+        wave(tasks, ts, act)
+    end
     for _, t in ipairs(tasks) do
         if t[1] == 'pull' then arm(t[2], t[4]) end
     end
@@ -1219,6 +1234,7 @@ local function save (a)
         VIS = VIS, NC = NC, NB = NB, NA = NA, PT = PT, RX = RX,
         TX = TX, TMAX = TMAX, RCN = RCN, CH = CH, CLA = CLA,
         PCL = PCL, MXP = MXP, MXF = MXF, MXV = MXV, R = R,
+        PW = PW, PK = PK, SOLOP = SOLOP, NOOP = NOOP, MK = MK,
     }
     local out = { 'return ' }
     dump(st, out)
@@ -1270,8 +1286,50 @@ local function restore ()
     RX, TX, TMAX, RCN, CH = st.RX, st.TX, st.TMAX, st.RCN, st.CH
     CLA, PCL, MXP, MXF, MXV = st.CLA, st.PCL, st.MXP, st.MXF, st.MXV
     R = st.R
+    PW, PK, SOLOP = st.PW or {}, st.PK or {}, st.SOLOP or {}
+    NOOP, MK = st.NOOP or {}, st.MK or MK
     t0 = now() - st.el
     return st.a
+end
+
+--[[
+-- A solo noop pull (alone, nothing new): the fixed sync cost.
+-- Skipped when an end is down or the pull would bring something
+-- (it would deliver early and change the run).
+-- Inputs:
+--  - p, q [integer]: receiver, source
+--  - ts   [number]: chain time
+-- Outputs:
+--  - [number|nil]: secs, nil when skipped
+-- Errors:
+--  - "noop : pull <to> <- <from> : <status>": failed or not a noop
+-- Callers:
+--  - main chunk [p2p.lua]: every SOLO actions
+--]]
+local function noop (p, q, ts)
+    if G.CHURN and not (up(p, ts) and up(q, ts)) then
+        return nil
+    end
+    local mg = MGONLY                   -- probe: no stats side effect
+    local u = useful(p, q)
+    MGONLY = mg
+    if u then
+        return nil
+    end
+    local f = io.open(G.BASE .. '/wave.sh', 'w')
+    f:write(script({ { 'pull', p, q, math.floor(ts) } }))
+    f:close()
+    os.execute("bash " .. G.BASE .. "/wave.sh")
+    local fh = assert(io.open(G.BASE .. '/status.1'))
+    local l = fh:read('l')
+    fh:close()
+    local rc, ns, nc = l:match("^pull %d+ %d+ (%d+) %a+ (%d+) (%d+):")
+    assert(rc == '0' and nc == '0', "noop : pull " .. NAME[p] .. " <- " ..
+        NAME[q] .. " : " .. l)
+    local s = tonumber(ns) / 1e9
+    NOOP[p] = NOOP[p] or {}
+    table.insert(NOOP[p], s)
+    return s
 end
 
 --[[
@@ -1385,6 +1443,34 @@ local function report (pre, na)
         print(string.format("%s pulls per %s peer: received median=%d max=%d  served median=%d max=%d",
             pre, t, r1, r3, t1, t3))
     end
+    -- solo vs in-wave means: since the last report, and all
+    local function avg (xs, i0, f)
+        local n, s = 0, 0
+        for i = i0 + 1, #(xs or {}) do
+            if not f or f(i) then n, s = n + 1, s + xs[i] end
+        end
+        return s / math.max(1, n), n
+    end
+    local function kw (k, w)
+        return function (i) return PK[i] == k and (not w or PW[i] == w) end
+    end
+    local all = { post=0, solo=0, n0=0, n1=0, pt=0 }
+    for _, x in ipairs({ { 'slice', MK }, { 'all', all } }) do
+        local m = x[2]
+        local a1, b1 = avg(POST, m.post)
+        local a2, b2 = avg(SOLOP, m.solo)
+        local a3, b3 = avg(NOOP[0], m.n0)
+        local a4, b4 = avg(NOOP[N-1], m.n1)
+        local a5, b5 = avg(PT, m.pt, kw('ff'))
+        local a6, b6 = avg(PT, m.pt, kw('ff', 1))
+        local a7, b7 = avg(PT, m.pt, kw('mg'))
+        local a8, b8 = avg(PT, m.pt, kw('mg', 1))
+        print(string.format("%s solo %s: post in-wave=%.3f (%d) solo=%.3f (%d)  noop %s=%.3f (%d) %s=%.3f (%d)  ff all=%.3f (%d) width-1=%.3f (%d)  mg all=%.3f (%d) width-1=%.3f (%d)",
+            pre, x[1], a1, b1, a2, b2, NAME[0], a3, b3, NAME[N-1], a4, b4,
+            a5, b5, a6, b6, a7, b7, a8, b8))
+    end
+    MK = { post=#POST, solo=#SOLOP, n0=#(NOOP[0] or {}),
+        n1=#(NOOP[N-1] or {}), pt=#PT }
 end
 
 local A0 = 0                        -- last action done (resume)
@@ -1424,8 +1510,9 @@ for a = A0 + 1, NE do
     -- the post shares its wave with pulls due in its tick
     TICK = (math.floor(ts / G.T.tick) + 1) * G.T.tick
     due(TICK)
+    local so = G.SOLO > 0 and a % G.SOLO == 0
     step({ { 'post', l, ts, key,
-        e[3] and (e[3] .. ' by ' .. NAME[l]), e[4] } }, ts, a)
+        e[3] and (e[3] .. ' by ' .. NAME[l]), e[4] } }, ts, a, so)
     arm(l, ts)
     -- ... then the mid pulls the post (and relays it as usual)
     if m then
@@ -1440,8 +1527,18 @@ for a = A0 + 1, NE do
     local nf, sf = mma(FF, jf)
     local nm, sm = mma(MG, jm)
     print(string.format(". %5d %3ds  %s  [%03d]  miss=%d  post=%.2f  pulls=%02d  ff[%02d]=%s  mg[%02d]=%s",
-        a, math.floor(now() - ta), NAME[l], w, miss, POST[#POST],
+        a, math.floor(now() - ta), NAME[l], w, miss,
+        so and SOLOP[#SOLOP] or POST[#POST],
         STATS.pulls - pa, nf, sf, nm, sm))
+    if so then
+        print(string.format("== %d solo post=%.3f", a, SOLOP[#SOLOP]))
+        for _, p in ipairs({ 0, N-1 }) do
+            local q = (TIER[p] == 'L') and UP[p] or ADJ[p][1]
+            local s = noop(p, q, ts)
+            print(string.format("== %d solo pull=%s %s %s", a, NAME[p],
+                s and "noop" or "skip", s and string.format("%.3f 0", s) or ""))
+        end
+    end
     if G.SWEEP and a % G.SWEEP == 0 then
         print(string.format("== %d sweep %.0fs  peer %s", a, sweep(),
             exec("du -sh " .. root(0) .. " | cut -f1")))
