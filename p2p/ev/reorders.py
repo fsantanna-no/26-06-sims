@@ -12,7 +12,14 @@ root, n, seed = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 now = sys.argv[4]
 repo = root + "/chains/usenet"
 git = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True, check=True).stdout
+# snapshots: one ref per commit (refs/local/<cid>) or one index
+# tree (refs/local:a/b/c/d/<cid>)
 snap = set(r.rsplit("/", 1)[1] for r in git("for-each-ref", "--format=%(refname)", "refs/local/").split())
+if not snap:
+    ps = [""]                       # walk the 4 fanout levels
+    for _ in range(5):
+        ps = git("ls-tree", "--name-only", "refs/local", *[p + "/" for p in ps if p]).split()
+    snap = set(p.rsplit("/", 1)[1] for p in ps)
 allm = git("rev-list", "--merges", "--parents", "HEAD").splitlines()
 merges = [l.split()[0] for l in allm if all(c in snap for c in l.split())]
 print(f"# merges {len(allm)} with snapshots at M, p1, p2: {len(merges)}")

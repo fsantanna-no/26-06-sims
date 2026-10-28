@@ -1408,6 +1408,18 @@
                   to the run without solo
                 - [ ] usenet rerun with the freechains refs fix:
                   after the chat full run (user: wait)
+            - refs fix smoke (ia-optim 89ca933, side by side,
+              26/10/28): PASS
+                - sim 30 posts: identical results; 4 refs/peer
+                - 5k: 1-commit pull 0.12 s (old 0.5-0.8), noop
+                  0.03 s (old 0.2); posts +20%; disk +36% (index
+                  trees: 41k vs 25k)
+                - driver: p2p.lua payload bytes, ev/reorders.py
+                  snapshots: both layouts
+                - freechains: clone re-execs arg[0] (bare rock
+                  script): loads /usr/local modules side by side
+                - [ ] stop chat run, `make install`, restart chat
+                  full + usenet rerun (wait for user)
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
