@@ -2,7 +2,7 @@
 -- Loaded by p2p.lua as G.
 
 local MODE   = 'corpus'     -- simple | corpus
-local CORPUS = 'chat'       -- corpus: chat | usenet (posts only)
+local CORPUS = os.getenv('CORPUS') or 'chat'  -- chat | usenet (posts only)
 
 -- relay secs per hop (push), U(min, max): decided 26/10/09:
 -- chat 1-2 (latency), usenet 1-60; simple: 0-1800 over 3600
@@ -14,7 +14,7 @@ local RL    = RELAY[KEY]
 -- env overrides (one run per command line, no file edits):
 -- LIMIT=<n>, SM=<secs>, LM=<secs>, PRESYNC=1, MERGES=1, MIX=1,
 -- CHURN=1, DEFER=1, EV_N=<n>, KEEP_N=<n>, CKPT_N=<n>, RESUME=1,
--- BASE=<dir>, SOLO=<n>
+-- BASE=<dir>, SOLO=<n>, CORPUS=<chat|usenet>
 local function env (k, v)
     return tonumber(os.getenv(k) or '') or v
 end
