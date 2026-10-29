@@ -210,7 +210,8 @@ end
 -- `pull` records the sync kind (ff: receiver HEAD is an ancestor
 -- of the source HEAD, else mg), the sync time, and the commits,
 -- bytes and actions (non-merge commits) received, the source
--- HEAD and the receiver's new HEAD (MERGES).
+-- HEAD and the receiver's new HEAD (MERGES), the wire bytes, the
+-- voided actions and the receiver's old HEAD.
 -- `post` records the post time and the new hash.
 -- Inputs:
 --  - tasks [table]: { {'pull', to, from, ts} | {'post', leaf, ts,
@@ -229,10 +230,14 @@ local function script (tasks)
         "  local ht=$(git -C $T" .. C .. " rev-parse HEAD) hf=$(git -C $F" .. C .. " rev-parse HEAD)",
         "  local k=mg",
         "  git -C $F" .. C .. " merge-base --is-ancestor $ht $hf 2>/dev/null && k=ff",
+        "  rm -f $B/pack.$1",
         "  local t0=$(date +%s%N)",
-        "  out=$(freechains --root=$T --now=$4 chain " .. G.ALIAS ..
+        -- wire: the packs git fetch receives (GIT_TRACE_PACKFILE)
+        "  out=$(GIT_TRACE_PACKFILE=$B/pack.$1 freechains --root=$T --now=$4 chain " .. G.ALIAS ..
             " sync recv $F" .. C .. " 2>&1); rc=$?",
         "  local t1=$(date +%s%N)",
+        "  local nw=$(stat -c %s $B/pack.$1 2>/dev/null || echo 0)",
+        "  local nv=$(echo \"$out\" | grep -c '^voided')",
         -- received: commits, bytes of new objects (uncompressed)
         -- + their payloads (not in ht..hn): refs/payloads/<cid>
         -- (one ref per post) or refs/payloads:a/b/c/d/<cid> (index);
@@ -242,7 +247,7 @@ local function script (tasks)
         "  local nb=$(git -C $T" .. C .. " rev-list --topo-order --objects $ht..$hn | cut -d' ' -f1 | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '{s+=$1} END {print s+0}')",
         "  nb=$((nb+$(git -C $T" .. C .. " rev-list --no-merges $ht..$hn | sed -E 's#^((.)(.)(.)(.).*)$#refs/payloads/\\1\\nrefs/payloads:\\2/\\3/\\4/\\5/\\1#' | git -C $T" .. C .. " cat-file --batch-check='%(objectsize)' | awk '$2!=\"missing\" {s+=$1} END {print s+0}')))",
         "  local na=$(git -C $T" .. C .. " rev-list --topo-order --no-merges --count $ht..$hn)",
-        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na:$hf:$hn $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
+        "  echo \"pull $2 $3 $rc $k $((t1-t0)) $nc:$nb:$na:$hf:$hn:$nw:$nv:$ht $(echo \"$out\" | grep -m1 ERROR | tr ' ' _)\" > $B/status.$1",
         "}",
         -- post <lane> <leaf> <ts> <key> <msg>
         "post () {",
@@ -278,6 +283,7 @@ end
 
 -------------------------------------------------------------------------------
 -- holders: which peers hold each action not yet everywhere
+-- (peer -> arrival chain time)
 -- A pull copies all of the source's actions to the receiver.
 -- An action held by all N peers is retired.
 
@@ -327,6 +333,211 @@ local PW, PK = {}, {}               -- per pull: wave width, kind (ff, mg)
 local SOLOP, NOOP = {}, {}          -- solo: post times; noop pull times per peer
 local MK = { post=0, solo=0, n0=0, n1=0, pt=0 }  -- report: slice starts
 
+local VIA = {}                       -- per active action: peer -> source
+local RCV = {}                       -- per receiver group: delays (s)
+local FST, HLF = {}, {}              -- per post: secs to the first, half
+local HOPS, LST = {}, {}             -- hops -> deliveries; group -> last
+local TOP = {}                       -- 10 slowest: { v, a, id, path }
+local WB, NVD = {}, 0                -- per pull: wire bytes; voided
+local RO, VD, FL = {}, {}, {}        -- per merge: reorders, voided, life
+local MS = { n=0, nosnap=0, both=0, unstable=0, nolife=0 }
+local MSEEN = {}                     -- merges measured (once per hash)
+local EVENTS                         -- the replay (set below)
+
+--[[
+-- Receiver group of a peer: S, or tier and class (M:on, L:lf).
+-- Inputs:
+--  - p [integer]: peer id
+-- Outputs:
+--  - [string]: the group
+-- Callers:
+--  - wave, report [p2p.lua]
+--]]
+local function grp (p)
+    if TIER[p] == 'S' then
+        return 'S'
+    end
+    return TIER[p] .. ':' .. tostring(CLASS[p])
+end
+
+--[[
+-- A post reached every peer: delays per receiver group, first
+-- and half the peers, hops, the last peer, the 10 slowest.
+-- Inputs:
+--  - a [integer]: the action
+-- Outputs:
+--  - none
+-- Callers:
+--  - wave [p2p.lua]
+--]]
+local function done (a)
+    local born, h, via = BORN[a], HOLD[a], VIA[a]
+    local ds, last, hop = {}, nil, {}
+    local function hp (p)
+        if not via[p] then return 0 end
+        hop[p] = hop[p] or hp(via[p]) + 1
+        return hop[p]
+    end
+    for p = 0, N-1 do
+        if via[p] then
+            local d, g = h[p] - born, grp(p)
+            RCV[g] = RCV[g] or {}
+            table.insert(RCV[g], d)
+            ds[#ds+1] = d
+            if not last or h[p] > h[last] then last = p end
+            local k = hp(p)
+            HOPS[k] = (HOPS[k] or 0) + 1
+        end
+    end
+    table.sort(ds)
+    FST[#FST+1] = ds[1] or 0
+    HLF[#HLF+1] = ds[math.ceil(N / 2) - 1] or 0   -- with the poster
+    if not last then return end
+    LST[grp(last)] = (LST[grp(last)] or 0) + 1
+    local v = h[last] - born
+    if #TOP < 10 or v > TOP[#TOP].v then
+        local path, p = {}, last
+        while p do
+            table.insert(path, 1, { p, h[p] })
+            p = via[p]
+        end
+        local f = EVENTS[a][4]
+        TOP[#TOP+1] = { v=v, a=a, path=path,
+            id = f and f:match('[^/]+$') or tostring(a) }
+        table.sort(TOP, function (x, y) return x.v > y.v end)
+        TOP[11] = nil
+    end
+end
+
+--[[
+-- The order chunks of a snapshot (blob ids, in order).
+-- Inputs:
+--  - p [integer]: peer whose repo holds the snapshot
+--  - c [string]: commit id
+-- Outputs:
+--  - [table]: blob ids (empty: no snapshot)
+-- Callers:
+--  - reorders [p2p.lua]
+--]]
+local function chunks (p, c)
+    local x = c:sub(1, 1) .. '/' .. c:sub(2, 2) .. '/' .. c:sub(3, 3) ..
+        '/' .. c:sub(4, 4) .. '/' .. c
+    local t = {}
+    for id in exec("git -C " .. dir(p) .. " ls-tree refs/local:" .. x ..
+            "/order"):gmatch("blob (%x+)\t") do
+        t[#t+1] = id
+    end
+    return t
+end
+
+--[[
+-- The actions in order chunks k.. (one list).
+-- Inputs:
+--  - p [integer]: peer whose repo holds the blobs
+--  - ids [table]: blob ids
+--  - k [integer]: first chunk
+-- Outputs:
+--  - [table]: action ids, in order
+-- Callers:
+--  - reorders [p2p.lua]
+--]]
+local function tail (p, ids, k)
+    local t = {}
+    if k > #ids then return t end
+    local out = exec("printf '%s\\n' " .. table.concat(ids, ' ', k) ..
+        " | git -C " .. dir(p) .. " cat-file --batch")
+    for l in out:gmatch("[^\n]+") do
+        if not l:find(' blob ') then
+            for c in l:gmatch("%x+") do t[#t+1] = c end
+        end
+    end
+    return t
+end
+
+--[[
+-- Actions of a parent's order moved by a merge: those outside
+-- its longest common prefix with the merge's order (0 when the
+-- merge only appends); stable: their relative order is kept.
+-- Inputs:
+--  - pm, cm [integer, string]: repo and commit of the merge
+--  - pp, cp [integer, string]: repo and commit of the parent
+-- Outputs:
+--  - [integer|nil]: moved actions (nil: no snapshot)
+--  - [boolean]: stable
+-- Callers:
+--  - merged [p2p.lua]
+--]]
+local function reorders (pm, cm, pp, cp)
+    local om, op = chunks(pm, cm), chunks(pp, cp)
+    if #om == 0 or #op == 0 then return nil end
+    local j = 1
+    while j <= #op and op[j] == om[j] do j = j + 1 end
+    if j > #op then return 0, true end
+    local tm, tp = tail(pm, om, j), tail(pp, op, j)
+    local k, set = 0, {}
+    while k < #tp and tp[k+1] == tm[k+1] do k = k + 1 end
+    for _, c in ipairs(tp) do set[c] = true end
+    local i = 1
+    for _, c in ipairs(tm) do
+        if set[c] then
+            if tp[i] ~= c then return #tp - k, false end
+            i = i + 1
+        end
+    end
+    return #tp - k, i == #tp + 1
+end
+
+--[[
+-- Measure a merge made by a pull (once per merge hash): actions
+-- moved on the loser side, voided, fork lifetime (merge time -
+-- the earliest action on either side).
+-- Inputs:
+--  - m [table]: { to, from, ht, hf, hn, nv, t }
+-- Outputs:
+--  - none
+-- Callers:
+--  - wave [p2p.lua]
+--]]
+local function merged (m)
+    local to, from, ht, hf, hn, nv, t = table.unpack(m)
+    if hn == ht or hn == hf or MSEEN[hn] then return end
+    MSEEN[hn] = true
+    local ps = {}
+    for c in exec("git -C " .. dir(to) .. " rev-parse " .. hn .. "^1 " ..
+            hn .. "^2"):gmatch("%x+") do
+        ps[#ps+1] = c
+    end
+    if #ps ~= 2 then return end
+    MS.n = MS.n + 1
+    VD[#VD+1] = tonumber(nv)
+    -- a parent's snapshot: the receiver's, else the source's
+    local function side (c)
+        local r, s = reorders(to, hn, to, c)
+        if r == nil and c == hf then r, s = reorders(to, hn, from, c) end
+        return r, s
+    end
+    local r1, s1 = side(ps[1])
+    local r2, s2 = side(ps[2])
+    if r1 and r2 then
+        RO[#RO+1] = math.max(r1, r2)
+        if r1 > 0 and r2 > 0 then MS.both = MS.both + 1 end
+        if not (s1 and s2) then MS.unstable = MS.unstable + 1 end
+    else
+        MS.nosnap = MS.nosnap + 1
+    end
+    local lo
+    for x in exec("git -C " .. dir(to) .. " log --no-merges --format=%at " ..
+            ps[1] .. "..." .. ps[2]):gmatch("%d+") do
+        x = tonumber(x)
+        if not lo or x < lo then lo = x end
+    end
+    if lo then
+        FL[#FL+1] = math.max(0, t - lo)
+    else
+        MS.nolife = MS.nolife + 1
+    end
+end
+
 --[[
 -- Run one wave: the tasks, one per lane, in parallel.
 -- Then updates the holders.
@@ -363,6 +574,7 @@ local function wave (tasks, ts, act)
     STATS.wall  = STATS.wall + (now() - t0)
     STATS.waves = STATS.waves + 1
     STATS.idle  = STATS.idle + (G.LANES - #tasks)
+    local mq = {}                       -- mg pulls: merges to measure
     for i = 1, #tasks do
         local fh = io.open(G.BASE .. '/status.' .. i)
         assert(fh, "wave : missing status (" .. (i-1) .. "/" .. #tasks .. ")")
@@ -376,7 +588,9 @@ local function wave (tasks, ts, act)
                 error(string.format("wave : post %s : rc=%s %s", NAME[to], rc, rest))
             end
             POST[#POST+1] = tonumber(ns) / 1e9
-            HOLD[act], CNT[act], ACTIVE[act] = { [to] = true }, 1, true
+            -- holders: peer -> arrival (chain time); sources
+            HOLD[act], CNT[act], ACTIVE[act] = { [to] = ts }, 1, true
+            VIA[act] = {}
             HEAD[to] = rest
             SEEN[to] = SEEN[to] or {}
             SEEN[to][rest] = true
@@ -387,9 +601,13 @@ local function wave (tasks, ts, act)
                     NAME[to], NAME[from], rc, rest))
             end
             STATS.pulls = STATS.pulls + 1
-            local nc, nb, na, hf, hn =
-                rest:match("^(%d+):(%d+):(%d+):(%x*):(%x*)")
+            local nc, nb, na, hf, hn, nw, nv, ht =
+                rest:match("^(%d+):(%d+):(%d+):(%x*):(%x*):(%d+):(%d+):(%x*)")
             NC[#NC+1], NB[#NB+1], NA[#NA+1] = tonumber(nc), tonumber(nb), tonumber(na)
+            WB[#WB+1], NVD = tonumber(nw), NVD + tonumber(nv)
+            if k == 'mg' then
+                mq[#mq+1] = { to, from, ht, hf, hn, nv, tasks[i][4] }
+            end
             PT[#PT+1] = tonumber(ns) / 1e9
             PCL[#PT] = CLASS[to]
             PW[#PT], PK[#PT] = #tasks, k
@@ -405,15 +623,21 @@ local function wave (tasks, ts, act)
             list[#list+1] = tonumber(ns) / 1e9
             for _, a in ipairs(gain[i]) do
                 if not HOLD[a][to] then
-                    HOLD[a][to], CNT[a] = true, CNT[a] + 1
+                    HOLD[a][to] = math.max(tasks[i][4], BORN[a])
+                    VIA[a][to], CNT[a] = from, CNT[a] + 1
                 end
             end
         end
     end
+    -- merges: measured while the peers are idle
+    for _, m in ipairs(mq) do
+        merged(m)
+    end
     TMAX = math.max(TMAX, ts)
     for a in pairs(ACTIVE) do
         if CNT[a] == N then
-            ACTIVE[a], HOLD[a] = nil, nil
+            done(a)
+            ACTIVE[a], HOLD[a], VIA[a] = nil, nil, nil
             VIS[#VIS+1] = ts - BORN[a]
             if CLA[a] then
                 local v = MXV[CLA[a]] or {}
@@ -488,7 +712,7 @@ end
 --  - simple: N_ACT artificial posts, T.action apart, by leaves
 --  - corpus: the first LIMIT events of SRC.tsv (posts only)
 
-local EVENTS = {}
+EVENTS = {}
 if G.MODE == 'simple' then
     for a = 1, G.N_ACT do
         EVENTS[a] = { G.T0 + a*G.T.action, nil, 'simple ' .. a, nil }
@@ -586,7 +810,7 @@ local HEAP, TIMER = {}, {}          -- pending fires; peer -> fire time
 --  - t [number]: chain time of the fire
 --  - p [integer]: peer (source)
 --  - q [integer|nil]: receiver of a deferred pull (session)
---  - tag [string|nil]: churn: 'rc' reconnect, 'df' deferred pull
+--  - tag [string|nil]: churn: 'rc' reconnect, 'df' deferred pull, 'rt' retry
 -- Outputs:
 --  - none
 -- Callers:
@@ -880,7 +1104,8 @@ end
 --[[
 -- Route a pull under churn: both ends up as is; a leaf whose
 -- mid is down uses its backup mid; a mid whose supers are all
--- down uses an up ring mid; else defer to when both are up.
+-- down uses an up ring mid (and retries the original pull when
+-- both are up); else defer to when both are up.
 -- Inputs:
 --  - to, from [integer]: receiver, source
 --  - t        [number]: chain time
@@ -915,6 +1140,11 @@ local function route (to, from, t, tag)
             end
         end
         if alt then
+            -- the original link still owes the pull: retry it when
+            -- both ends are up (the alternative may lack it; else a
+            -- session leaf waits for its mid's next news, days)
+            CH.retry = (CH.retry or 0) + 1
+            hpush(math.max(nextup(to, t), nextup(from, t)), from, to, 'rt')
             if u == to then return to, alt end
             return alt, from
         end
@@ -1236,6 +1466,9 @@ local function save (a)
         TX = TX, TMAX = TMAX, RCN = RCN, CH = CH, CLA = CLA,
         PCL = PCL, MXP = MXP, MXF = MXF, MXV = MXV, R = R,
         PW = PW, PK = PK, SOLOP = SOLOP, NOOP = NOOP, MK = MK,
+        VIA = VIA, RCV = RCV, FST = FST, HLF = HLF, HOPS = HOPS,
+        LST = LST, TOP = TOP, WB = WB, NVD = NVD, RO = RO, VD = VD,
+        FL = FL, MS = MS, MSEEN = MSEEN,
     }
     local out = { 'return ' }
     dump(st, out)
@@ -1289,6 +1522,10 @@ local function restore ()
     R = st.R
     PW, PK, SOLOP = st.PW or {}, st.PK or {}, st.SOLOP or {}
     NOOP, MK = st.NOOP or {}, st.MK or MK
+    VIA, RCV, FST, HLF = st.VIA or {}, st.RCV or {}, st.FST or {}, st.HLF or {}
+    HOPS, LST, TOP, WB = st.HOPS or {}, st.LST or {}, st.TOP or {}, st.WB or {}
+    NVD, RO, VD, FL = st.NVD or 0, st.RO or {}, st.VD or {}, st.FL or {}
+    MS, MSEEN = st.MS or MS, st.MSEEN or {}
     t0 = now() - st.el
     return st.a
 end
@@ -1413,9 +1650,9 @@ local function report (pre, na)
                 100 * s / math.max(1, n * span), n)
         end
         local r1, r2, r3 = q(RCN)
-        print(string.format("%s churn: down %s  deferred=%d  backup=%d  ring=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
+        print(string.format("%s churn: down %s  deferred=%d  backup=%d  ring=%d  retry=%d  reconnect pulls=%d commits median=%d p90=%d max=%d",
             pre, table.concat(dt, ", "), CH.defer, CH.backup, CH.ring,
-            CH.rc, r1, r2, r3))
+            CH.retry or 0, CH.rc, r1, r2, r3))
         if G.DEFER then
             -- deferred posts among the actions done
             local d = {}
@@ -1432,6 +1669,86 @@ local function report (pre, na)
     local b1, b2, b3 = q(NB)
     print(string.format("%s per pull: commits median=%d p90=%d max=%d  bytes median=%d p90=%d max=%d  total=%.1fMB",
         pre, c1, c2, c3, b1, b2, b3, sum(NB) / 1e6))
+    -- r4: propagation, wire bytes, merges (all, and since the
+    -- last report)
+    local function sl (xs, i0)
+        return table.move(xs, i0 + 1, #xs, 1, {})
+    end
+    local function hq (xs)
+        local x1, x2, x3 = q(xs)
+        return string.format("median=%.1f p90=%.1f max=%.1f", x1 / 3600,
+            x2 / 3600, x3 / 3600)
+    end
+    for _, x in ipairs({ { 'all', {} }, { 'slice', MK } }) do
+        local m = x[2]
+        print(string.format("%s %s propagation (h): all %s  first %s  half %s  (%d posts)",
+            pre, x[1], hq(sl(VIS, m.vis or 0)), hq(sl(FST, m.fst or 0)),
+            hq(sl(HLF, m.hlf or 0)), #VIS - (m.vis or 0)))
+        local gs = {}
+        for g in pairs(RCV) do gs[#gs+1] = g end
+        table.sort(gs)
+        for _, g in ipairs(gs) do
+            local r = sl(RCV[g], (m.rcv or {})[g] or 0)
+            print(string.format("%s %s propagation (h) to %s: %s  (%d)",
+                pre, x[1], g, hq(r), #r))
+        end
+        local w1, w2, w3 = q(sl(WB, m.wb or 0))
+        print(string.format("%s %s wire per pull: median=%d p90=%d max=%d  total=%.1fMB  (objects %.1fMB)",
+            pre, x[1], w1, w2, w3, sum(sl(WB, m.wb or 0)) / 1e6,
+            sum(sl(NB, m.wb or 0)) / 1e6))
+        local ro = sl(RO, m.ro or 0)
+        local r1, r2, r3 = q(ro)
+        local v1, _, v3 = q(sl(VD, m.vd or 0))
+        print(string.format("%s %s merges=%d  reorders (loser) median=%d p90=%d max=%d mean=%.2f  voided median=%d max=%d total=%d",
+            pre, x[1], #ro, r1, r2, r3, sum(ro) / math.max(1, #ro),
+            v1, v3, sum(sl(VD, m.vd or 0))))
+        print(string.format("%s %s fork life (h): %s  (%d merges; 7-day margin %.1f h)",
+            pre, x[1], hq(sl(FL, m.fl or 0)), #FL - (m.fl or 0),
+            (7 * 86400 - select(3, q(sl(FL, m.fl or 0)))) / 3600))
+    end
+    print(string.format("%s merges measured=%d  no snapshot=%d  both sides moved=%d  unstable=%d  no life=%d  voided (pulls)=%d",
+        pre, MS.n, MS.nosnap, MS.both, MS.unstable, MS.nolife, NVD))
+    local hs, nh = {}, 0
+    for k, n in pairs(HOPS) do
+        for _ = 1, n do hs[#hs+1] = k end
+        nh = nh + n
+    end
+    local h1, h2, h3 = q(hs)
+    local ls = {}
+    for g, n in pairs(LST) do ls[#ls+1] = string.format("%s=%d", g, n) end
+    table.sort(ls)
+    print(string.format("%s hops per delivery: median=%d p90=%d max=%d (%d)  last peer: %s",
+        pre, h1, h2, h3, nh, table.concat(ls, " ")))
+    -- the 10 slowest posts: path, per hop wait and outages
+    for i, t in ipairs(TOP) do
+        local hs = {}
+        for j, x in ipairs(t.path) do
+            local p, tp = x[1], x[2]
+            if j == 1 then
+                hs[#hs+1] = NAME[p]
+            else
+                local s, ts = t.path[j-1][1], t.path[j-1][2]
+                local function down (r)
+                    local d = 0
+                    for _, o in ipairs(DOWN[r] or {}) do
+                        if o[1] < tp and o[2] > ts then
+                            d = d + math.min(o[2], tp) - math.max(o[1], ts)
+                        end
+                    end
+                    return d
+                end
+                hs[#hs+1] = string.format("%s +%.1fh [%s%s]", NAME[p],
+                    (tp - ts) / 3600, session(s, p, ts) and 'ses' or
+                    (KIND[s] and KIND[s][p] and 'on' or 'bk'),
+                    string.format(" down %s %.1fh %s %.1fh", NAME[s],
+                        down(s) / 3600, NAME[p], down(p) / 3600))
+            end
+        end
+        print(string.format("%s top %d: %.1fh post %d (%s) %s last %s (%s): %s",
+            pre, i, t.v / 3600, t.a, t.id, NAME[t.path[1][1]],
+            NAME[t.path[#t.path][1]], grp(t.path[#t.path][1]),
+            table.concat(hs, " -> ")))
+    end
     for _, t in ipairs({ 'S', 'M', 'L' }) do
         local rx, tx = {}, {}
         for p = 0, N-1 do
@@ -1470,8 +1787,11 @@ local function report (pre, na)
             pre, x[1], a1, b1, a2, b2, NAME[0], a3, b3, NAME[N-1], a4, b4,
             a5, b5, a6, b6, a7, b7, a8, b8))
     end
+    local rc = {}
+    for g, xs in pairs(RCV) do rc[g] = #xs end
     MK = { post=#POST, solo=#SOLOP, n0=#(NOOP[0] or {}),
-        n1=#(NOOP[N-1] or {}), pt=#PT }
+        n1=#(NOOP[N-1] or {}), pt=#PT, vis=#VIS, fst=#FST, hlf=#HLF,
+        rcv=rc, wb=#WB, ro=#RO, vd=#VD, fl=#FL }
 end
 
 local A0 = 0                        -- last action done (resume)

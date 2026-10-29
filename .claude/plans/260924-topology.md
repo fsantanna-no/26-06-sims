@@ -1418,8 +1418,36 @@
                   snapshots: both layouts
                 - freechains: clone re-execs arg[0] (bare rock
                   script): loads /usr/local modules side by side
-                - [ ] stop chat run, `make install`, restart chat
-                  full + usenet rerun (wait for user)
+                - [x] user ran `make install` (26/10/28 20:26):
+                  killed chat full at 30,988 and reorders at 2,428
+                - [x] usenet r3 (stopped 11,380) (26/10/28 20:29, PID
+                  1697736): CORPUS=usenet SM=21600 LM=86400
+                  MERGES=1 MIX=1 CHURN=1 EV_N=0 SOLO=100, log
+                  `logs/usenet-full-mix-churn-r3.log`
+                    - vs r2: backup fix, alpha 2.5, rng fix, index
+                      refs, solo timings
+                    - `config.lua`: CORPUS env
+                    - @7820 (10.6 h): 15% faster than r2, forks
+                      54% (r2 60%)
+                    - [x] 5k report sent to paper: solo post =
+                      in-wave (0.090), noop 0.055, width-1 = all;
+                      S1 disk 19.0 MB (snapshots 59%), kept = gc'd
+                    - r2 pull bytes: commits only (no payloads,
+                      started before 0944465); told uerj
+                    - [ ] send uerj per-5k commits/bytes per pull
+                      (from ckpt state.lua, scratch `xfer.lua`)
+                    - [ ] send uerj visibility per 5k and END
+                      (scratch `pending.lua`)
+                    - visibility: only time to all peers and the
+                      poster class; no per-peer arrivals, last
+                      peer or hops
+                    - [ ] arrivals per peer (first, 50%, all, by
+                      receiver class, hops): new run or resume
+                      from a ckpt; ask user
+                    - outages capped at 72 h (r2 and r3); session
+                      leaves: 24 h dial-in
+                - [ ] chat full restart, reorders resume (old
+                  build side by side): not yet (user)
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
@@ -1477,6 +1505,41 @@
       online + catch-up before posting; backup links only while
       the primary uplink is down (both directions)
     - [ ] simple test with churn; then corpus runs
+
+# Usenet r4 (26/10/29, asked by uerj; user: "go ahead on all")
+
+- [x] patch `p2p.lua`: HOLD = arrival, VIA, done(), merged(),
+  reorders() from snapshot order chunks, pack trace, voided
+- [x] `ev/begs.py`: blocked.py for the index layout + `sum`
+  (200 posts in 6 s)
+- [x] smoke test usenet 300: PASS; new lines OK
+- [x] bug (r2, r3): a rerouted pull (backup mid lacking the
+  post) was dropped and never retried; post 240 reached L44
+  after 146.6 h (M8 down 16.8 h); fix: route() also retries
+  the original pull when both ends are up (tag 'rt')
+- [x] begs r3 10k: W=500 0.86% posts, 47 of 1373 authors
+- [x] smoke rerun with the fix: PASS, max 146.6 -> 78.4 h
+- [x] r3 stopped at 11,380 (26/10/29 12:08); keeps 5k, 10k
+- [ ] r4 running (26/10/29 12:10, PID 3891489): r3 command
+  with KEEP=usenet-full-mix-churn-r4, log
+  `logs/usenet-full-mix-churn-r4.log`; ETA ~02/11
+- [ ] per 5k: send uerj; END: begs.py on the final keep
+
+- same as r3 (reports per 5k, SOLO=100, keep S1/L45) plus:
+- [ ] arrivals: time and hops per post per peer (HOLD: ts);
+  delay by receiver class (on/ps/lf leaves, mids, supers);
+  first / 50% / all
+- [ ] last peer per post; top-10 longest: path and the
+  outages on it
+- [ ] wire bytes per sync: GIT_TRACE_PACKFILE, pack sizes
+- [ ] reorders at every mg sync, inline: snapshot `order`
+  at ht, hf, hn; voided per merge too
+- [ ] fork lifetime: merge-base ht hf, its last action time;
+  max vs 7 days
+- [ ] begs at W=500/1000: post hoc, new script for the
+  index layout (not blocked.py)
+- cost: ~+5-10% (reorders +2-4 h); ETA ~80-85 h
+- [ ] user: approve the edit; stop r3 or wait for its END
 
 # Won't do
 
