@@ -7,10 +7,12 @@
 # reorders(p) = actions of order(p) outside its longest common
 # prefix with order(M) (moved by the merge); only merges with
 # stored snapshots at M, p1, p2 (others cannot be listed)
-import sys, random, subprocess, time
+import sys, os, random, subprocess, time
 root, n, seed = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 now = sys.argv[4]
-repo = root + "/chains/usenet"
+# chain: the alias link under <root>/chains (usenet, chat)
+name = next(x for x in os.listdir(root + "/chains") if os.path.islink(root + "/chains/" + x))
+repo = root + "/chains/" + name
 git = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True, check=True).stdout
 # snapshots: one ref per commit (refs/local/<cid>) or one index
 # tree (refs/local:a/b/c/d/<cid>)
@@ -36,7 +38,7 @@ cache = {}                          # last few orders (bounded)
 def order (c):
     if c not in cache:
         git("update-ref", "refs/heads/main", c)
-        out = subprocess.run(["freechains", "--root=" + root, "--now=" + now, "chain", "/usenet", "list", "order"], capture_output=True, text=True, check=True).stdout
+        out = subprocess.run(["freechains", "--root=" + root, "--now=" + now, "chain", "/" + name, "list", "order"], capture_output=True, text=True, check=True).stdout
         cache[c] = out.split()
         if len(cache) > 8:
             del cache[next(iter(cache))]

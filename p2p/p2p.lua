@@ -1442,17 +1442,17 @@ local function dump (v, out)
 end
 
 --[[
--- Save a checkpoint after action `a`: the run state into
--- G.BASE/state.lua, then G.BASE copied to CKPT (replaced only
--- once the copy is complete).
+-- Write the run state after action `a` into G.BASE/state.lua.
 -- Inputs:
 --  - a [integer]: last action done
 -- Outputs:
---  - [number]: wall secs
+--  - [number]: wall secs (from the call)
 -- Callers:
---  - main chunk [p2p.lua]: every G.CKPT_N actions
+--  - save [p2p.lua]: every checkpoint
+--  - main chunk [p2p.lua]: at END (per-pull samples of the last
+--    slice; copied into the final keep)
 --]]
-local function save (a)
+local function state (a)
     local c0 = now()
     local st = {
         a = a, el = c0 - t0,
@@ -1475,6 +1475,23 @@ local function save (a)
     local f = assert(io.open(G.BASE .. '/state.lua', 'w'))
     f:write(table.concat(out), '\n')
     f:close()
+    return now() - c0
+end
+
+--[[
+-- Save a checkpoint after action `a`: the run state (`state`),
+-- then G.BASE copied to CKPT (replaced only once the copy is
+-- complete).
+-- Inputs:
+--  - a [integer]: last action done
+-- Outputs:
+--  - [number]: wall secs
+-- Callers:
+--  - main chunk [p2p.lua]: every G.CKPT_N actions
+--]]
+local function save (a)
+    local c0 = now()
+    state(a)
     exec("rm -rf " .. CKPT .. ".new && cp -a " .. G.BASE .. " " .. CKPT ..
         ".new && rm -rf " .. CKPT .. " && mv " .. CKPT .. ".new " .. CKPT)
     return now() - c0
@@ -1674,23 +1691,26 @@ local function report (pre, na)
     local function sl (xs, i0)
         return table.move(xs, i0 + 1, #xs, 1, {})
     end
+    -- unit: seconds in chat (relay only), hours otherwise
+    local U, UN = 3600, 'h'
+    if CHAIN == 'chat' then U, UN = 1, 's' end
     local function hq (xs)
         local x1, x2, x3 = q(xs)
-        return string.format("median=%.1f p90=%.1f max=%.1f", x1 / 3600,
-            x2 / 3600, x3 / 3600)
+        return string.format("median=%.1f p90=%.1f max=%.1f", x1 / U,
+            x2 / U, x3 / U)
     end
     for _, x in ipairs({ { 'all', {} }, { 'slice', MK } }) do
         local m = x[2]
-        print(string.format("%s %s propagation (h): all %s  first %s  half %s  (%d posts)",
-            pre, x[1], hq(sl(VIS, m.vis or 0)), hq(sl(FST, m.fst or 0)),
+        print(string.format("%s %s propagation (%s): all %s  first %s  half %s  (%d posts)",
+            pre, x[1], UN, hq(sl(VIS, m.vis or 0)), hq(sl(FST, m.fst or 0)),
             hq(sl(HLF, m.hlf or 0)), #VIS - (m.vis or 0)))
         local gs = {}
         for g in pairs(RCV) do gs[#gs+1] = g end
         table.sort(gs)
         for _, g in ipairs(gs) do
             local r = sl(RCV[g], (m.rcv or {})[g] or 0)
-            print(string.format("%s %s propagation (h) to %s: %s  (%d)",
-                pre, x[1], g, hq(r), #r))
+            print(string.format("%s %s propagation (%s) to %s: %s  (%d)",
+                pre, x[1], UN, g, hq(r), #r))
         end
         local w1, w2, w3 = q(sl(WB, m.wb or 0))
         print(string.format("%s %s wire per pull: median=%d p90=%d max=%d  total=%.1fMB  (objects %.1fMB)",
@@ -1702,9 +1722,9 @@ local function report (pre, na)
         print(string.format("%s %s merges=%d  reorders (loser) median=%d p90=%d max=%d mean=%.2f  voided median=%d max=%d total=%d",
             pre, x[1], #ro, r1, r2, r3, sum(ro) / math.max(1, #ro),
             v1, v3, sum(sl(VD, m.vd or 0))))
-        print(string.format("%s %s fork life (h): %s  (%d merges; 7-day margin %.1f h)",
-            pre, x[1], hq(sl(FL, m.fl or 0)), #FL - (m.fl or 0),
-            (7 * 86400 - select(3, q(sl(FL, m.fl or 0)))) / 3600))
+        print(string.format("%s %s fork life (%s): %s  (%d merges; 7-day margin %.1f %s)",
+            pre, x[1], UN, hq(sl(FL, m.fl or 0)), #FL - (m.fl or 0),
+            (7 * 86400 - select(3, q(sl(FL, m.fl or 0)))) / U, UN))
     end
     print(string.format("%s merges measured=%d  no snapshot=%d  both sides moved=%d  unstable=%d  no life=%d  voided (pulls)=%d",
         pre, MS.n, MS.nosnap, MS.both, MS.unstable, MS.nolife, NVD))
@@ -1737,15 +1757,15 @@ local function report (pre, na)
                     end
                     return d
                 end
-                hs[#hs+1] = string.format("%s +%.1fh [%s%s]", NAME[p],
-                    (tp - ts) / 3600, session(s, p, ts) and 'ses' or
+                hs[#hs+1] = string.format("%s +%.1f%s [%s%s]", NAME[p],
+                    (tp - ts) / U, UN, session(s, p, ts) and 'ses' or
                     (KIND[s] and KIND[s][p] and 'on' or 'bk'),
-                    string.format(" down %s %.1fh %s %.1fh", NAME[s],
-                        down(s) / 3600, NAME[p], down(p) / 3600))
+                    string.format(" down %s %.1f%s %s %.1f%s", NAME[s],
+                        down(s) / U, UN, NAME[p], down(p) / U, UN))
             end
         end
-        print(string.format("%s top %d: %.1fh post %d (%s) %s last %s (%s): %s",
-            pre, i, t.v / 3600, t.a, t.id, NAME[t.path[1][1]],
+        print(string.format("%s top %d: %.1f%s post %d (%s) %s last %s (%s): %s",
+            pre, i, t.v / U, UN, t.a, t.id, NAME[t.path[1][1]],
             NAME[t.path[#t.path][1]], grp(t.path[#t.path][1]),
             table.concat(hs, " -> ")))
     end
@@ -1937,6 +1957,7 @@ for i = 1, math.min(10, #keys) do
     bad_r = bad_r + same("reps member " .. keys[i] .. ".pub")
 end
 report("== END", NE)
+print(string.format("== END state %.0fs", state(NE)))
 
 print(string.format("== END order: %d actions, %d of %d peers differ | reps: %d mismatches over %d authors",
     norder, bad_o, N - 1, bad_r, math.min(10, #keys)))
@@ -1946,6 +1967,7 @@ print((bad_o == 0 and bad_r == 0 and norder == NE) and "== PASS" or "== FAIL")
 if G.KEEP then
     local k = string.format("%s/.freechains-keep/%s-final", DIR, G.KEEP)
     exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
-        root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. k)
+        root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. G.BASE ..
+        "/state.lua " .. k)
     print("== END kept " .. k)
 end

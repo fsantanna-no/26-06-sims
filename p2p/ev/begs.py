@@ -30,7 +30,9 @@ if sys.argv[1] == "sum":
     sys.exit(summary(sys.argv[2]))
 
 root, keys, n, seed = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-repo = root + "/chains/usenet"
+# chain: the alias link under <root>/chains (usenet, chat)
+name = next(x for x in os.listdir(root + "/chains") if os.path.islink(root + "/chains/" + x))
+repo = root + "/chains/" + name
 git = lambda *a, i=None: subprocess.run(["git", "-C", repo, *a], input=i, capture_output=True, text=True, check=True).stdout
 idx = lambda c: f"refs/local:{c[0]}/{c[1]}/{c[2]}/{c[3]}/{c}"
 
@@ -80,7 +82,7 @@ sample = rows if n <= 0 else random.sample(rows, min(n, len(rows)))
 
 def reps (parent, now, m):
     git("update-ref", "refs/heads/main", parent)
-    r = subprocess.run(["freechains", "--root=" + root, "--now=" + str(now), "chain", "/usenet", "reps", "member", pub[m]], capture_output=True, text=True)
+    r = subprocess.run(["freechains", "--root=" + root, "--now=" + str(now), "chain", "/" + name, "reps", "member", pub[m]], capture_output=True, text=True)
     return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip().lstrip("-").isdigit() else None
 
 t0 = time.time()

@@ -1520,10 +1520,38 @@
 - [x] begs r3 10k: W=500 0.86% posts, 47 of 1373 authors
 - [x] smoke rerun with the fix: PASS, max 146.6 -> 78.4 h
 - [x] r3 stopped at 11,380 (26/10/29 12:08); keeps 5k, 10k
-- [ ] r4 running (26/10/29 12:10, PID 3891489): r3 command
-  with KEEP=usenet-full-mix-churn-r4, log
-  `logs/usenet-full-mix-churn-r4.log`; ETA ~02/11
-- [ ] per 5k: send uerj; END: begs.py on the final keep
+- [x] r4 done (26/10/31 18:35): PASS, 195,830 s (r2 318,572),
+  r3 command with KEEP=usenet-full-mix-churn-r4, log
+  `logs/usenet-full-mix-churn-r4.log`, keep `...-r4-final`
+    - forks 63% (on 51%, ps 64%, lf 88%); r2 67%
+    - propagation (h) 28.2/35.8/87.7; max: M2 down 52.5 h
+    - reorders 1/4/22, voided 0, fork life 11.4/27.0/58.0 h
+    - S1 gc'd: 39.6/13.8/96.4 = 149.8 MB, 3.8x (r2 3.9x)
+    - clamps 27.8%, P-S 4.4/14.0/48.7 h
+    - slow pulls (>= 2 s): session leaves' 24 h backlog,
+      ~0.13 s + 0.04 s per commit
+- [x] per 5k and END: sent to paper (2606-vcs-f7)
+- [x] begs on the final keep, sent to paper: W=500 0.95%
+  posts, 194 of 3938 authors (4.9%); W=1000 0.07%
+
+# Chat full restart (26/10/31)
+
+- [x] `p2p.lua`: chat reports in seconds (propagation, fork
+  life, top posts); hours otherwise
+- [x] `p2p.lua`: END writes state.lua (per-pull samples of
+  the last slice), copied into the final keep
+- [x] `ev/begs.py`, `ev/reorders.py`: chain from the alias
+  link under `<root>/chains` (was `/usenet`)
+- [x] smoke chat 30: PASS, reports in s, state.lua in keep
+  `chat-smoke-r2-final`; last peer prints `L:nil` (no MIX)
+- [x] r4 reps tsv for paper (scratch `reps_replay_ix.py`):
+  11,348 authors (merged corpus), 44 at cap
+- [ ] running (26/10/31 19:27, PID 663788): CORPUS=chat
+  LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
+  KEEP=chat-full-r2 (SOLO=100), log `logs/chat-full-r2.log`
+    - wipes `.freechains-p2p-chat` (6.1 GB, killed run);
+      keeps `chat-full-bk-*` untouched; disk 119 GB free
+- [ ] r2 reorders resume on the old build (`ab304a9`): ask
 
 - same as r3 (reports per 5k, SOLO=100, keep S1/L45) plus:
 - [ ] arrivals: time and hops per post per peer (HOLD: ts);
