@@ -1549,6 +1549,23 @@
 - [ ] running (26/10/31 19:27, PID 663788): CORPUS=chat
   LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
   KEEP=chat-full-r2 (SOLO=100), log `logs/chat-full-r2.log`
+    - ETA ~11/11 (refit 23k: 2660 + 39 s per k per 1k; 2x
+      growth: 16/11)
+    - [x] 20k + tsvs sent: forks 11%, pull mean 0.19 s, S1
+      40.6 MB (40.6x), vis 3743/14815/65379 s (L21 down 18 h)
+    - [x] 5k, 10k sent to paper: forks 10% (= old), pull mean
+      0.19 s (old 0.25), S1 18.9 MB at 10k (37.8x)
+    - [ ] per 5k: send paper scratch `chat-r2-stor1k-<N>k.tsv`
+      (gc'd S1 copy) and `chat-r2-ops1k-<N>k.tsv` (copy the
+      ckpt state.lua before the next 5k); 10k, 20k, 25k sent
+    - 25k: burst 23-24k (ff mean 0.29 s); max pull 63 s = one
+      1541-commit catch-up (0.04 s/commit); S1 52.5 MB
+- [x] interim for paper from chat-full-bk (old build): scratch
+  `chat-bk-stor1k-30k.tsv` (42.35 MB, 28.8x; ref per cid,
+  packed-refs 5.8 MB outside) and `chat-bk-ops1k-30k.tsv`
+  (30k ckpt saved as `chat-bk-state-30k.lua`; log tail row)
+- [ ] END for paper: ops1k (16 cols, END state.lua), stor1k
+  (11 cols, gc'd S1), END report, clamps, begs; 1k slices
     - wipes `.freechains-p2p-chat` (6.1 GB, killed run);
       keeps `chat-full-bk-*` untouched; disk 119 GB free
 - [ ] r2 reorders resume on the old build (`ab304a9`): ask
