@@ -5,6 +5,9 @@
 
 # Pending
 
+- `p2p.lua` MIX: split mid class (on | mid) from leaf class
+  (on | ps | lf), so reports group M:ps with M:lf (yellow
+  middles); future builds only, not r5 (asked by f7)
 - wiki profiles (event, factual, BLP): breadth, outside
   `260928-eval.md`
 - godot calm control: outside `260928-eval.md`
