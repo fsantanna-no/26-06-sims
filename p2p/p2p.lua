@@ -342,7 +342,7 @@ local WB, NVD = {}, 0                -- per pull: wire bytes; voided
 local RO, VD, FL = {}, {}, {}        -- per merge: reorders, voided, life
 local MS = { n=0, nosnap=0, both=0, unstable=0, nolife=0 }
 local MSEEN = {}                     -- merges measured (once per hash)
-local PF, AF                         -- dump: posts.tsv, arrivals.tsv
+local PF, AF, MF                     -- dump: posts, arrivals, merges
 local EVENTS                         -- the replay (set below)
 
 --[[
@@ -505,6 +505,7 @@ end
 -- Measure a merge made by a pull (once per merge hash): actions
 -- moved on the loser side, voided, fork lifetime (merge time -
 -- the earliest action on either side).
+-- Dump: one row in merges.tsv (a: posts made so far).
 -- Inputs:
 --  - m [table]: { to, from, ht, hf, hn, nv, t }
 -- Outputs:
@@ -524,6 +525,7 @@ local function merged (m)
     if #ps ~= 2 then return end
     MS.n = MS.n + 1
     VD[#VD+1] = tonumber(nv)
+    local ro, un, li = '', '', ''           -- dump: empty if unknown
     -- a parent's snapshot: the receiver's, else the source's
     local function side (c)
         local r, s = reorders(to, hn, to, c)
@@ -536,6 +538,7 @@ local function merged (m)
         RO[#RO+1] = math.max(r1, r2)
         if r1 > 0 and r2 > 0 then MS.both = MS.both + 1 end
         if not (s1 and s2) then MS.unstable = MS.unstable + 1 end
+        ro, un = RO[#RO], (s1 and s2) and 0 or 1
     else
         MS.nosnap = MS.nosnap + 1
     end
@@ -547,9 +550,13 @@ local function merged (m)
     end
     if lo then
         FL[#FL+1] = math.max(0, t - lo)
+        li = string.format("%.4f", FL[#FL] / 3600)
     else
         MS.nolife = MS.nolife + 1
     end
+    MF:write(string.format("%d\t%s\t%s\t%s\t%s\t%s\t%.0f\t%s\t%s\t%s\t%s\n",
+        #BORN, hn, ps[1], ps[2], NAME[to], NAME[from], t, ro,
+        nv, un, li))
 end
 
 --[[
@@ -787,9 +794,11 @@ end
 -- dump (append: a resume continues the checkpoint's copy)
 PF = assert(io.open(G.BASE .. '/posts.tsv', 'a'))
 AF = assert(io.open(G.BASE .. '/arrivals.tsv', 'a'))
+MF = assert(io.open(G.BASE .. '/merges.tsv', 'a'))
 if PF:seek('end') == 0 then
     PF:write("a\tpost_id\tclass\tauthor\tborn\tfirst_h\thalf_h\tall_h\n")
     AF:write("a\tpeer\tgroup\thops\tt_h\n")
+    MF:write("a\tmerge\tp1\tp2\tto\tfrom\tt\treorders\tvoided\tunstable\tlife_h\n")
 end
 
 -- keys: one per leaf (simple), one per author (corpus, lazily)
@@ -1478,6 +1487,7 @@ local function state (a)
     local c0 = now()
     PF:flush()
     AF:flush()
+    MF:flush()
     local st = {
         a = a, el = c0 - t0,
         HOLD = HOLD, CNT = CNT, ACTIVE = ACTIVE,
@@ -1993,6 +2003,6 @@ if G.KEEP then
     exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
         root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. G.BASE ..
         "/state.lua " .. G.BASE .. "/posts.tsv " .. G.BASE ..
-        "/arrivals.tsv " .. k)
+        "/arrivals.tsv " .. G.BASE .. "/merges.tsv " .. k)
     print("== END kept " .. k)
 end

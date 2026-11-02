@@ -1578,9 +1578,26 @@
   post_id, class, author, born, first/half/all h) and
   `arrivals.tsv` (a, peer, group, hops, t_h); flushed in
   state(), so ckpt and resume stay consistent; END keep
-- [ ] running (26/11/01 21:01, PID 1335603): r4 command,
-  KEEP=usenet-full-mix-churn-r5, log
-  `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 03:30
+- [x] smoke usenet 300 (CKPT_N=100): PASS; dump 300 posts,
+  17,700 arrivals, first/half/all = report; keep
+  `usenet-smoke-r5-final`
+- [x] 2nd start stopped at 2,571 (26/11/02 01:30) for the
+  merges dump (log `...-r5-stopped2.log`)
+- [x] `p2p.lua` merged(): row per measured merge to
+  `merges.tsv` (a = posts so far, merge, p1, p2, to, from,
+  t, reorders, voided, unstable, life_h)
+- [x] smoke 300 (`usenet-smoke-r5b`): PASS; 76 merges, rows
+  = END aggregates (reorders 1/3/4, unstable 2, life n=75)
+- [ ] END post hoc for f7: forks.tsv (a, post_id, class,
+  miss from log, clamp_h from S1 order, fork_life_h = post
+  to the first merge joining it with what it lacked);
+  per-1k fork ratio by class (also per 5k)
+- [x] 5k sent to f7 (02/11 09:40): 27,453 s (r4 26,626);
+  scratch r5-{stor1k,ops1k,forks1k,posts,arrivals,merges}-5k
+  (`forks1k.lua`: CLA of state + miss of log)
+- [ ] running (26/11/02 01:47, PID 2278487): r4 command,
+  KEEP=usenet-full-mix-churn-r5,
+  log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
 - [ ] per 5k: report to f7 (as r4); END: dump, ops1k,
   stor1k, report, clamps, begs
 - [ ] then resume chat from its 25k ckpt (ask)
