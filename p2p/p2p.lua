@@ -342,6 +342,7 @@ local WB, NVD = {}, 0                -- per pull: wire bytes; voided
 local RO, VD, FL = {}, {}, {}        -- per merge: reorders, voided, life
 local MS = { n=0, nosnap=0, both=0, unstable=0, nolife=0 }
 local MSEEN = {}                     -- merges measured (once per hash)
+local PF, AF                         -- dump: posts.tsv, arrivals.tsv
 local EVENTS                         -- the replay (set below)
 
 --[[
@@ -363,6 +364,7 @@ end
 --[[
 -- A post reached every peer: delays per receiver group, first
 -- and half the peers, hops, the last peer, the 10 slowest.
+-- Dump: one row in posts.tsv, one per peer in arrivals.tsv.
 -- Inputs:
 --  - a [integer]: the action
 -- Outputs:
@@ -378,6 +380,7 @@ local function done (a)
         hop[p] = hop[p] or hp(via[p]) + 1
         return hop[p]
     end
+    local au = '-'
     for p = 0, N-1 do
         if via[p] then
             local d, g = h[p] - born, grp(p)
@@ -387,11 +390,22 @@ local function done (a)
             if not last or h[p] > h[last] then last = p end
             local k = hp(p)
             HOPS[k] = (HOPS[k] or 0) + 1
+        elseif h[p] then
+            au = NAME[p]                -- the poster (no source)
+        end
+        if h[p] then
+            AF:write(string.format("%d\t%s\t%s\t%d\t%.4f\n", a,
+                NAME[p], grp(p), hp(p), (h[p] - born) / 3600))
         end
     end
     table.sort(ds)
     FST[#FST+1] = ds[1] or 0
     HLF[#HLF+1] = ds[math.ceil(N / 2) - 1] or 0   -- with the poster
+    local f = EVENTS[a][4]
+    PF:write(string.format("%d\t%s\t%s\t%s\t%.0f\t%.4f\t%.4f\t%.4f\n", a,
+        f and f:match('[^/]+$') or tostring(a), tostring(CLA[a] or '-'),
+        au, born, FST[#FST] / 3600, HLF[#HLF] / 3600,
+        last and (h[last] - born) / 3600 or 0))
     if not last then return end
     LST[grp(last)] = (LST[grp(last)] or 0) + 1
     local v = h[last] - born
@@ -768,6 +782,14 @@ else
     end
     local ok0, n0 = heads()
     assert(ok0, "setup : clones disagree (" .. n0 .. " heads)")
+end
+
+-- dump (append: a resume continues the checkpoint's copy)
+PF = assert(io.open(G.BASE .. '/posts.tsv', 'a'))
+AF = assert(io.open(G.BASE .. '/arrivals.tsv', 'a'))
+if PF:seek('end') == 0 then
+    PF:write("a\tpost_id\tclass\tauthor\tborn\tfirst_h\thalf_h\tall_h\n")
+    AF:write("a\tpeer\tgroup\thops\tt_h\n")
 end
 
 -- keys: one per leaf (simple), one per author (corpus, lazily)
@@ -1454,6 +1476,8 @@ end
 --]]
 local function state (a)
     local c0 = now()
+    PF:flush()
+    AF:flush()
     local st = {
         a = a, el = c0 - t0,
         HOLD = HOLD, CNT = CNT, ACTIVE = ACTIVE,
@@ -1968,6 +1992,7 @@ if G.KEEP then
     local k = string.format("%s/.freechains-keep/%s-final", DIR, G.KEEP)
     exec("rm -rf " .. k .. " && mkdir -p " .. k .. " && cp -a " ..
         root(0) .. " " .. root(N-1) .. " " .. KEYS .. " " .. G.BASE ..
-        "/state.lua " .. k)
+        "/state.lua " .. G.BASE .. "/posts.tsv " .. G.BASE ..
+        "/arrivals.tsv " .. k)
     print("== END kept " .. k)
 end

@@ -1546,7 +1546,9 @@
   `chat-smoke-r2-final`; last peer prints `L:nil` (no MIX)
 - [x] r4 reps tsv for paper (scratch `reps_replay_ix.py`):
   11,348 authors (merged corpus), 44 at cap
-- [ ] running (26/10/31 19:27, PID 663788): CORPUS=chat
+- [x] stopped at 28,317 (26/11/01 20:58, for r5); keeps
+  5k-25k and ckpt 25k kept (RESUME=1 later)
+- [ ] was running (26/10/31 19:27, PID 663788): CORPUS=chat
   LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
   KEEP=chat-full-r2 (SOLO=100), log `logs/chat-full-r2.log`
     - ETA ~11/11 (refit 23k: 2660 + 39 s per k per 1k; 2x
@@ -1569,6 +1571,19 @@
     - wipes `.freechains-p2p-chat` (6.1 GB, killed run);
       keeps `chat-full-bk-*` untouched; disk 119 GB free
 - [ ] r2 reorders resume on the old build (`ab304a9`): ask
+
+# Usenet r5: per-post dump (26/11/01, asked by f7; user: yes)
+
+- [x] `p2p.lua` done(): rows to `<BASE>/posts.tsv` (a,
+  post_id, class, author, born, first/half/all h) and
+  `arrivals.tsv` (a, peer, group, hops, t_h); flushed in
+  state(), so ckpt and resume stay consistent; END keep
+- [ ] running (26/11/01 21:01, PID 1335603): r4 command,
+  KEEP=usenet-full-mix-churn-r5, log
+  `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 03:30
+- [ ] per 5k: report to f7 (as r4); END: dump, ops1k,
+  stor1k, report, clamps, begs
+- [ ] then resume chat from its 25k ckpt (ask)
 
 - same as r3 (reports per 5k, SOLO=100, keep S1/L45) plus:
 - [ ] arrivals: time and hops per post per peer (HOLD: ts);
