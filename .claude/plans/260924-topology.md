@@ -1595,6 +1595,20 @@
 - [x] 5k sent to f7 (02/11 09:40): 27,453 s (r4 26,626);
   scratch r5-{stor1k,ops1k,forks1k,posts,arrivals,merges}-5k
   (`forks1k.lua`: CLA of state + miss of log)
+- [x] 10k sent (02/11 18:30): 56,293 s (r4 54,091); same
+  propagation, fork life as r4; firefox killed 15:43
+- [x] reboot 02/11 ~21:24: run died at ~11,500; resumed
+  RESUME=1 from 10k ckpt (21:29, PID 2549), log
+  `logs/usenet-full-mix-churn-r5-resume.log` (posts match);
+  ETA ~04/11 16:00; END: join r5.log up to 10k + resume log
+- [x] /tmp scratch wiped: scripts rebuilt from the session
+  jsonl (ops1k, forks1k, stor1k checked vs 10k); sent tsvs
+  lost (r4 30k state, chat 10k/20k states: not rebuildable)
+- [x] f7 gone after reboot; paper session is now 2606-vcs-4e
+  (user OK), told status + lost scratch files; 4e: no
+  rebuild (paper data in its repo imgs/); END list: posts,
+  arrivals, merges, forks, forks1k, ops1k, stor1k, clamps,
+  begs, END report
 - [ ] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
