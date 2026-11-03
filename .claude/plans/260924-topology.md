@@ -1609,6 +1609,9 @@
   rebuild (paper data in its repo imgs/); END list: posts,
   arrivals, merges, forks, forks1k, ops1k, stor1k, clamps,
   begs, END report
+- [x] 15k sent to 4e (03/11 07:30): 84,663 s (r4 81,619);
+  same forks; ops1k from scratch r5-join.log (r5.log to
+  10k ckpt + resume log); ETA ~04/11 14:30
 - [ ] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
