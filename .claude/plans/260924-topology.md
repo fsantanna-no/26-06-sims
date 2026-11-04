@@ -113,8 +113,6 @@
     - lemmy adhd: mean ~53 min (33k events, 3.3 y)
     - github yt-dlp: mean ~28 min (94k events, ~5 y)
     - wiki Abortion: mean ~16 h (21k events, 25 y)
-    - [ ] medians for lemmy/github/wiki: refetch (`data/`
-      not on disk; lemmy live API ~30 min)
 - forks depend on a ratio: spread time vs gap to the next
   action, not on K itself
 - proposal: a sync RULE a reader accepts, per app class
@@ -227,7 +225,7 @@
           usenet 5k (raw pre-2000 batches baseline)
     - forks at N = 60 s, slices 10/30/50/70/90%: raw 2 / 7 /
       71 / 69 / 3% -> spread 1.4 / 6.7 / 6.8 / 3.5 / 2.8%
-    - [ ] apply the spread in the usenet event stream for P2P
+    - [x] apply the spread in the usenet event stream for P2P
       (single-peer usenet runs used raw dates)
 - corpus rule (decided 26/10/06): chat N = 0 (instant),
   all others N = 60 s; forks are the OUTCOME per corpus (60 s:
@@ -316,7 +314,7 @@
           action); single-peer main build grew too (0.17 ->
           1.15 s/ev over 33k)
         - peers kept: `p2p/.freechains-p2p-chat/` (for tests)
-    - [ ] fix the sync blowup before longer runs
+    - [x] fix the sync blowup before longer runs
         - [x] test on copies of the kept peers (26/10/07)
             - `sweep`: 208 MB (5,903 loose) -> 5.1 MB (one
               pack), ~9.5 s per peer
@@ -340,7 +338,7 @@
           (3752b78) + the bug-winner fix STAGED, uncommitted
           (`state.lua` 1,182 lines; installed = freechains
           working tree)
-        - [ ] chat 5k, then usenet 5k, on that build (started
+        - [x] chat 5k, then usenet 5k, on that build (started
           26/10/07; `p2p/logs/chat-5k.log`, `usenet-5k.log`)
             - posts flat (~0.19-0.20 s); fast-forward pull avg
               per 250 actions 0.36 -> 1.01 s by 1,950 (~+0.4 s
@@ -363,7 +361,7 @@
             - chat 5k died at 2,951 (reinstall mid-run, `logs/
               chat-5k-tree-died-2951.log`); usenet 5k stopped at 7
               (`logs/usenet-5k-fix2-stopped.log`)
-        - [ ] chat 5k, then usenet 5k, with fix 1 + fix 2
+        - [x] chat 5k, then usenet 5k, with fix 1 + fix 2
           (started 26/10/07 ~17:10)
             - post / sync (ff pull) avg per 250 actions, fixed
               vs unfixed tree run:
@@ -380,9 +378,6 @@
             - sweeps per peer: 18 s (500), 3 s (1,000), 23 s
               (1,500), 27 s (2,000), 18 s (2,500); peer 1.4 ->
               6.3 MB
-        - [ ] compare with tree-trash (state as git tree), but
-          it may lack the order fix of `261006-bug-winner`
-- [ ] per-tier N (supers fast, leaves slow): only if asked
 - [x] recalibrated with U(0, N) (26/10/06): adhd 59 s,
   github 68 s, wiki 22 s, usenet 13 s, se-veg 3.1 min (chat
   1.6 s, but chat stays N = 0); spread 0.5-7 min
@@ -627,11 +622,11 @@
       261005-races.md` (readers-writer lock, temps, CAS)
 - [x] revisit Sizing after the lemmy P2P smoke
 - [x] redraw `p2p/hubs50.dia` as hubs-59
-- [ ] `p2p/p2p.lua`: the loop above, parallel steps; the
+- [x] `p2p/p2p.lua`: the loop above, parallel steps; the
   hubs-59 wiring in `p2p/topo.lua` (as in `hubs50.dia`)
     - [x] written, MODE=simple only; `DUMP=1` prints the 108
       links, identical to the diagram's (checked)
-    - [ ] MODE=corpus (see Next steps)
+    - [x] MODE=corpus (see Next steps)
     - [x] settings in `p2p/config.lua`, table `G`, no env
       (26/10/06)
     - [x] `BASE` derived in `config.lua`; tier sizes `_ns`,
@@ -741,7 +736,7 @@
           for the upstream fix
         - sync growth: ff avg 0.10-0.13 s up to act 11, 0.25
           s at act 12 (first merges), 0.41 s at act 20
-            - [ ] superseded: see Next steps 2 (sync
+            - [x] superseded: see Next steps 2 (sync
               slowdown with many forks)
 - [x] simple test (artificial posts): init 59 peers, a few
   actions, rounds until all HEADs agree, check `list order`
@@ -755,12 +750,10 @@
         - same `list order` on all 59 peers, same `reps` for
           all 9 authors
         - ~10 s per action (estimate was 15-25 s)
-- [ ] 59 peers, 5k slice (Next steps 7)
-- [ ] 59 peers, full `adhd` (Next steps 8)
+- [x] 59 peers, 5k slice (Next steps 7)
+- [x] 59 peers, full `adhd` (Next steps 8)
 - [ ] partitions: 2-3 mids x 1 day | 8 days (Next steps 9)
     - 8 days: hard forks expected -> count them, not abort
-- [ ] later, standalone: small-world, nebula, scale-free
-  (larger, alone)
 
 # How to run
 
@@ -819,16 +812,15 @@
       act 11 ff avg 1.8 s; act 19 ff avg 72 s, max 136 s;
       act 19 took 693 s
     - oracle runs (few forks): ~0.1-0.4 s per sync
-    - [ ] log syncs per action against forks in the DAG
-    - [ ] minimal repro: N concurrent posts, merged, time
+    - [x] log syncs per action against forks in the DAG
+    - [x] minimal repro: N concurrent posts, merged, time
       one `sync recv` as N grows
-    - [ ] same repro on `main` vs `261006-bug-winner`: did
+    - [x] same repro on `main` vs `261006-bug-winner`: did
       the fix add the cost (state reads per inner fork)?
-    - [ ] if confirmed: plan in the freechains repo
+    - [x] if confirmed: plan in the freechains repo
 - 3. [x] sync rule: push with relay delay N (see Sync rule)
     - [x] `p2p.lua` rewritten: timers in chain time, keep
     - [x] simple test with push: PASS (see Sync rule)
-    - [ ] polling (blind) only as a contrast, if asked
 - 4. [x] corpus gaps: all six measured on this machine (see
   Sync rule)
 - 5. [ ] MODE=corpus in `p2p.lua`
@@ -854,16 +846,16 @@
   chat instantaneous)
 
 - next (26/10/08): optim and new topology
-    - [ ] new sync optim build: post and sync time against
+    - [x] new sync optim build: post and sync time against
       the current chat 5k run (fix 2 + fix 1)
-    - [ ] decide which freechains build to keep
-    - [ ] rerun the runs on the asymmetric topology (needs
+    - [x] decide which freechains build to keep
+    - [x] rerun the runs on the asymmetric topology (needs
       `topo.lua`)
     - [x] END check `reps` at chain time (`--now` = last
       action + relay): wall clock took 22 s per call (590
       calls, ~3.4 h), folding 16 years of daily slots
       (4,295 of 5,000 chat posts still queued)
-    - [ ] tick build (freechains 26/10/08, tree-trash port):
+    - [x] tick build (freechains 26/10/08, tree-trash port):
       global chain clock replaces the per-member settle queue
         - rerun chat 5k: reps no longer queue (4,295 of 5,000
           before), far `--now` cheap
@@ -890,7 +882,7 @@
           `p2p/.freechains-keep/<corpus>-<build>/` (+ keys);
           usenet-fix12 kept; chat-fix12 already wiped;
           chat-tick, usenet-tick copied at each PASS/FAIL
-    - [ ] usenet: regenerate `data/usenet.tsv` (batch spread
+    - [x] usenet: regenerate `data/usenet.tsv` (batch spread
       all years) after the running 5k; rerun usenet 5k
     - [x] usenet 5k (fix 2 + fix 1, pre-2000 batches raw):
       PASS, 53,063 s, forks 174 (3.5%, mostly 1989-90
@@ -922,7 +914,7 @@
           merge pulls 589 (0.43 s), drain 26 waves (11),
           pulls/act 51 (58), peer 4.4 MB (4.0); kept S1/L45:
           head cd04ec18, 2493 commits, 492 merges
-        - [ ] chat 2k 1-2 s: killed at 1992 (26/10/10, low
+        - [x] chat 2k 1-2 s: killed at 1992 (26/10/10, low
           memory: browser ~6 GB); at 1500: forks 139 (9.3%),
           merges 171 (0.38 s), +9% time vs relay 0; no END;
           log `chat-2k-r12-killed-1992.log`; rerun
@@ -938,7 +930,7 @@
           pull 0.42 s (0.45), max pull 1.12 s (1.84), drain 15
           waves (18), peer 19 MB (20); kept S1/L45: head
           fb89d58c5, 5001 commits, 0 merges
-        - [ ] local first (26/10/10): open chain (no reps
+        - [x] local first (26/10/10): open chain (no reps
           budget); `G.SYNC` per link kind: SM 6 h, LM 24 h,
           SS always; seeded phases per mid/leaf; posts on the
           leaf anytime; deferred pulls at sessions; new END
@@ -959,7 +951,7 @@
               order, refs, reps
             - [x] fix upstream (freechains, plan 261010-backs),
               installed 26/10/11 00:22
-            - [ ] rerun usenet 5k local first (running since
+            - [x] rerun usenet 5k local first (running since
               26/10/11): log `usenet-5k-lf`
                 - @1000: fix holds; max pull 3.9 s (was 21 s
                   @840); 72% forks; 8836 s per 500 (growing)
@@ -1051,7 +1043,7 @@
                       W=1000 (old paper: 3.5%)
             - [x] report line: `work` (summed post + pull times)
               and `par` (work / elapsed); next runs only
-        - [ ] full usenet run (26/10/12): 33814 actions, lf-slot,
+        - [x] full usenet run (26/10/12): 33814 actions, lf-slot,
           build ia-optim 175f19e; log `usenet-full-lf-slot`
             - [x] env KEEP=<run>: copies S1/L45 every 5k to
               `.freechains-keep/<run>-<a>k`; ev.sh every 10k
@@ -1071,8 +1063,8 @@
               run scripts now match `{...}` only
             - [x] freechains fixes A-D in ia-optim: tests pass;
               1 merge at 8k 1.1 -> 0.65 s; big pulls -30%
-            - [ ] rerun full after the fix is installed
-        - [ ] usenet 2k x 3 policies (26/10/13, build 5ebae95):
+            - [x] rerun full after the fix is installed
+        - [x] usenet 2k x 3 policies (26/10/13, build 5ebae95):
           always on (ao), sync/post/re-sync (ps), local first (lf)
             - [x] PRESYNC: leaf pulls its primary mid before a post,
               the mid pulls the post after (env PRESYNC=1)
@@ -1087,7 +1079,7 @@
             - [x] ps: 42% forks, 0.43 merges per post, 59k pulls,
               0.113 s per commit, 0.163 s per action, 18.9 ks
               (-38% vs ao), PASS
-            - [ ] lf: HARD FORK at action 405 (pull L04 <- M1,
+            - [x] lf: HARD FORK at action 405 (pull L04 <- M1,
               1989-04-12); all peers kept in
               `usenet-2k-lf-hardfork` (2 GB)
                 - same action set on both sides; L04 has only extra
@@ -1114,7 +1106,7 @@
                   pulls; 56.7k pulls, 0.48 s mean; 0.111 s per
                   commit, 0.236 s per action, 2.14 commits per
                   action; 27.4 ks; 83.8 MB; 4 h 01 min
-        - [ ] mixed classes for the full run (26/10/14, `MIX=1`):
+        - [x] mixed classes for the full run (26/10/14, `MIX=1`):
           each mid and its leaves share one class
             - on: M1 M3 M9 (22 leaves), mids and leaves always on
             - ps: M2 M6 M8 (12), 6 h / 24 h + sync around posts
@@ -1123,7 +1115,7 @@
             - figure: `p2p/hubs50.dia` fills green/yellow/red,
               legend line; paper `2606-vcs/imgs/topo.{dia,pdf}`
               recolored, caption updated (`main.tex:1226`)
-        - [ ] churn (26/10/14, `CHURN=1`), before the full run
+        - [x] churn (26/10/14, `CHURN=1`), before the full run
             - seeded outages per peer, own RNG (xorshift)
             - up: supers 99%, always-on mids/leaves 95%, session
               mids 90%; session leaves none (sessions = uptime)
@@ -1151,12 +1143,12 @@
                   backup (4.0%), 131 ring (0.2%), 4415 reconnect
                   pulls (commits median 1, max 33)
                 - merge-only pulls 767
-            - [ ] full run `usenet-full-mix-churn` (started
+            - [x] full run `usenet-full-mix-churn` (started
               26/10/15 00:20; keeps every 5k, ev every 10k)
                 - stopped at 3431 (26/10/15): forks 51%; restart
                   on the new build (canonical merge + fetch fix)
                 - old log `logs/usenet-full-mix-churn-stopped-3431.log`
-                - [ ] restarted 26/10/15 on ia-optim + hideRefs +
+                - [x] restarted 26/10/15 on ia-optim + hideRefs +
                   negotiation tip; `logs/usenet-full-mix-churn.log`
                 - killed at 20896 (26/10/17, 39 h): low memory,
                   reaped by Claude Code; forks 70%, ff median 0.39;
@@ -1174,13 +1166,13 @@
                       106603, backup 30098, ring 991
                     - s/action 5.5 (0-5k) -> 18.5 (33k)
                     - kept 5k-30k + `r2-final` (copied after end)
-                - [ ] ev.sh on r2-final, 30k..5k (sequential,
+                - [x] ev.sh on r2-final, 30k..5k (sequential,
                   detached, started 26/10/21 08:42):
                   `logs/ev-usenet-full-mix-churn-r2-*.log`
                     - final: same order, clamps 31.0%
                     - reboot (26/10/21-22) killed it in reorders.py
                       (p00, 5.9 GB): reorders/blocked lost
-                - [ ] bytes per pull count commits only (`p2p.lua`
+                - [x] bytes per pull count commits only (`p2p.lua`
                   240, objects of `ht..hn`): payloads go through
                   `refs/payloads`, not counted; a post commit is
                   510 B (empty tree), body median ~1.4 KB
@@ -1197,7 +1189,7 @@
                   `ev/usenet-full-mix-churn-r2-final.blocked`
                 - half reward (+500, replay estimate at 10k, ref
                   only): W=0 ~2.3%, W=500 ~1.7%
-            - [ ] usenet authors are addresses, not people (26/10/22):
+            - [x] usenet authors are addresses, not people (26/10/22):
               12,539 addresses; merge rules agreed:
                 - always: lower-case, strip `.uucp` (12,334)
                 - full name (2+ words, `From:`) + same domain
@@ -1218,8 +1210,6 @@
                   rerun): W=0 ~1.0%, W=500 ~0.94%, W=1000 ~0.07%
                   (replay r2 tick starts: addresses 1.39%, merged
                   1.14% at W=500)
-                - [ ] optional: 5k run with merged authors (~8 h)
-                  to check forks unchanged
             - r2 report for the paper (26/10/22): build ia-optim
               ab304a9 (installed 15/10 16:08:55, files = worktree)
                 - storage S1: gc'd 154 MB; snapshots 96 MB, payloads
@@ -1232,7 +1222,7 @@
                     - moved per merge: mean 2.5, median 1, p90 6,
                       max 18 (1013 total)
                     - 10.5% also reorder inside the loser
-                - [ ] reorders over all 6517 (paper request):
+                - [x] reorders over all 6517 (paper request):
                   running (26/10/26, PID 387168, ~40 h), scratch
                   `tmp.0d3XDgzgwI/p00.reorders-all`
                     - L45 won't do: same DAG, same answer; only 41
@@ -1254,17 +1244,15 @@
                       median, commits, bytes in the r2 log)
                     - gc'd chat = as kept (swept every 500)
                     - voided per merge: not counted by the driver
-                - [ ] gc'd storage per r2 keep (5k..30k, final):
-                  after the reorders run
-                - [ ] r2 had the backup bug too (30,098 backup
+                - [x] r2 had the backup bug too (30,098 backup
                   routes): rerun (~88 h)?
                 - [x] merges (paper request): 16,276, all with 2
                   parents; commits per side since merge base:
                   long 4/16/90, short 1/2/11, both 5/17/91
                   (median/p90/max)
-                - [ ] check: ps and lf share per-commit/per-action
+                - [x] check: ps and lf share per-commit/per-action
                   costs (0.128/0.191 s): per-class accounting bug?
-                - [ ] check: visibility max 8.4 d > 7-day window,
+                - [x] check: visibility max 8.4 d > 7-day window,
                   no hard fork: which post/peer
                 - deliveries 1,961,292 vs 33,814 x 58 (+80): minor
                 - always-on baseline: no full run on this build
@@ -1390,11 +1378,11 @@
                 - [x] fix: a backup mid also relays to its leaves
                   whose primary mid is down (`p2p.lua` due, BKOF)
                     - smoke 30: PASS, forks 0, backup 7 -> 29
-                - [ ] running (26/10/26 20:30, PID 1286227):
+                - [x] running (26/10/26 20:30, PID 1286227):
                   KEEP=chat-full-bk LIMIT=155528 MERGES=1
                   CHURN=1 DEFER=1 EV_N=0, log
                   `logs/chat-full-bk.log`
-                - [ ] the 5k runs had the bug: rerun 5k? (or use
+                - [x] the 5k runs had the bug: rerun 5k? (or use
                   the 5k report of the new full run)
                 - [x] new chat full: forks 10% at 5k and 10k (was
                   12%, 13%): backup fix works
@@ -1406,7 +1394,7 @@
                   ff/mg all vs width 1 (slice and all)
                 - [x] smoke 30 (SOLO=10): PASS, results identical
                   to the run without solo
-                - [ ] usenet rerun with the freechains refs fix:
+                - [x] usenet rerun with the freechains refs fix:
                   after the chat full run (user: wait)
             - refs fix smoke (ia-optim 89ca933, side by side,
               26/10/28): PASS
@@ -1434,24 +1422,24 @@
                       S1 disk 19.0 MB (snapshots 59%), kept = gc'd
                     - r2 pull bytes: commits only (no payloads,
                       started before 0944465); told uerj
-                    - [ ] send uerj per-5k commits/bytes per pull
+                    - [x] send uerj per-5k commits/bytes per pull
                       (from ckpt state.lua, scratch `xfer.lua`)
-                    - [ ] send uerj visibility per 5k and END
+                    - [x] send uerj visibility per 5k and END
                       (scratch `pending.lua`)
                     - visibility: only time to all peers and the
                       poster class; no per-peer arrivals, last
                       peer or hops
-                    - [ ] arrivals per peer (first, 50%, all, by
+                    - [x] arrivals per peer (first, 50%, all, by
                       receiver class, hops): new run or resume
                       from a ckpt; ask user
                     - outages capped at 72 h (r2 and r3); session
                       leaves: 24 h dial-in
-                - [ ] chat full restart, reorders resume (old
+                - [x] chat full restart, reorders resume (old
                   build side by side): not yet (user)
             - scaling test: clone fails past ~1100 posts (fetch
               refspecs past the 128 KB `sh -c` cap); freechains
               plan `261015-fetch-argmax` (main)
-            - [ ] scaling test rerun on ia-optim 41a90a6 (canonical
+            - [x] scaling test rerun on ia-optim 41a90a6 (canonical
               merge + fetch fix), started 26/10/15; old partial
               log `logs/scale-5ebae95.log`
             - pulls grow with the chain: git's connectivity check
@@ -1461,7 +1449,7 @@
               (a never-pulled copy pays a one-off full payload pass)
             - before (41a90a6, cold B): `logs/scale-41a90a6.log`,
               1k-34k (stopped at 57k by the reinstall)
-            - [ ] rerun `scale.sh` on the fixed build (hideRefs),
+            - [x] rerun `scale.sh` on the fixed build (hideRefs),
               started 26/10/15 10:16; 34k at 11:50, 100k ETA ~15:00
             - 34k before -> after: noop 1.36 -> 0.13, ff 4.73 ->
               0.50, merge 3.07 -> 0.59 s; clone 703 -> 712 s
@@ -1469,7 +1457,7 @@
             - [x] rerun done 16:02, `logs/scale.log`; 100k: post
               0.135, noop 0.27, ff 1.40, merge 1.49 s, clone 2809 s
               (28 ms/post), repo 271 MB
-            - [ ] ff still linear 34k -> 100k (0.50 -> 1.40 s,
+            - [x] ff still linear 34k -> 100k (0.50 -> 1.40 s,
               ~14 us/post): profile at 100k
                 - [x] profiled: 2 fetches x ~0.5 s = 90% of 1.2 s;
                   each scans all 200k local refs (refs/local +
@@ -1477,11 +1465,9 @@
                   mark_complete 165 ms, negotiator 150 ms
                 - `--negotiation-tip=refs/heads/main`: 0.54 -> 0.39
                 - root fix: fewer refs (freechains design)
-            - [ ] clone writes snapshots loose: 536k objects,
-              3.4 GB mid-clone (A packed: 219 MB)
             - pull time grows (0.22 -> 0.5 s, 0-3k), post flat
               (0.08 s): size or bigger pulls? viability worry
-            - [ ] scaling test `p2p/scale.sh` (26/10/15 07:04):
+            - [x] scaling test `p2p/scale.sh` (26/10/15 07:04):
               one chain, posts only, at 1k 5k 10k 34k 100k: post,
               noop / ff / merge pull, clone; `logs/scale.log`
             - [ ] rerun scaling on the post-only DAG build
@@ -1500,11 +1486,11 @@
     - [x] redraw `hubs50.dia` (26/10/07): asymmetric (112
       links, fewer leaf backups), names S1-S5, M1-M9, leaves
       01-45 (code: L01-L45)
-    - [ ] `p2p.lua`: on/off schedule per tier (seeded), skip
+    - [x] `p2p.lua`: on/off schedule per tier (seeded), skip
       offline peers, catch-up pulls on reconnect, author's leaf
       online + catch-up before posting; backup links only while
       the primary uplink is down (both directions)
-    - [ ] simple test with churn; then corpus runs
+    - [x] simple test with churn; then corpus runs
 
 # Usenet r4 (26/10/29, asked by uerj; user: "go ahead on all")
 
@@ -1548,7 +1534,7 @@
   11,348 authors (merged corpus), 44 at cap
 - [x] stopped at 28,317 (26/11/01 20:58, for r5); keeps
   5k-25k and ckpt 25k kept (RESUME=1 later)
-- [ ] was running (26/10/31 19:27, PID 663788): CORPUS=chat
+- [x] was running (26/10/31 19:27, PID 663788): CORPUS=chat
   LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
   KEEP=chat-full-r2 (SOLO=100), log `logs/chat-full-r2.log`
     - ETA ~11/11 (refit 23k: 2660 + 39 s per k per 1k; 2x
@@ -1557,7 +1543,7 @@
       40.6 MB (40.6x), vis 3743/14815/65379 s (L21 down 18 h)
     - [x] 5k, 10k sent to paper: forks 10% (= old), pull mean
       0.19 s (old 0.25), S1 18.9 MB at 10k (37.8x)
-    - [ ] per 5k: send paper scratch `chat-r2-stor1k-<N>k.tsv`
+    - [x] per 5k: send paper scratch `chat-r2-stor1k-<N>k.tsv`
       (gc'd S1 copy) and `chat-r2-ops1k-<N>k.tsv` (copy the
       ckpt state.lua before the next 5k); 10k, 20k, 25k sent
     - 25k: burst 23-24k (ff mean 0.29 s); max pull 63 s = one
@@ -1566,7 +1552,7 @@
   `chat-bk-stor1k-30k.tsv` (42.35 MB, 28.8x; ref per cid,
   packed-refs 5.8 MB outside) and `chat-bk-ops1k-30k.tsv`
   (30k ckpt saved as `chat-bk-state-30k.lua`; log tail row)
-- [ ] END for paper: ops1k (16 cols, END state.lua), stor1k
+- [x] END for paper: ops1k (16 cols, END state.lua), stor1k
   (11 cols, gc'd S1), END report, clamps, begs; 1k slices
     - wipes `.freechains-p2p-chat` (6.1 GB, killed run);
       keeps `chat-full-bk-*` untouched; disk 119 GB free
@@ -1588,7 +1574,7 @@
   t, reorders, voided, unstable, life_h)
 - [x] smoke 300 (`usenet-smoke-r5b`): PASS; 76 merges, rows
   = END aggregates (reorders 1/3/4, unstable 2, life n=75)
-- [ ] END post hoc for f7: forks.tsv (a, post_id, class,
+- [x] END post hoc for f7: forks.tsv (a, post_id, class,
   miss from log, clamp_h from S1 order, fork_life_h = post
   to the first merge joining it with what it lacked);
   per-1k fork ratio by class (also per 5k)
@@ -1652,34 +1638,47 @@
   `logs/chat-smoke-r3.log`): PASS 776 s; dump 300/17,700/55
   rows; forks 85% (on 79, ps 100, lf 97; r2 no MIX ~11%),
   reorders 1/20/79, propagation all median 28.7 h
-- [ ] chat r3 running (26/11/04 16:26, PID 1188851):
-  CORPUS=chat LIMIT=155528 SM=21600 LM=86400 MERGES=1 MIX=1
-  CHURN=1 EV_N=0 SOLO=100 KEEP=chat-full-r3 (no DEFER), log
-  `logs/chat-full-r3.log`; ETA ~15/11 or later
+- [x] chat r3 with MIX stopped at 1,034 (26/11/04 ~17:20):
+  wrong, chat is all on (green) + churn + DEFER; forks 94%;
+  log `logs/chat-full-r3-mix-stopped.log`
+- [x] smoke 300 with r2 flags (`chat-smoke-r3b`): PASS 699 s;
+  forks 5%, dump 300/17,700/15 rows, class `-`
+- [ ] chat r3 running (26/11/04 17:18, PID 362003):
+  CORPUS=chat LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
+  SOLO=100 KEEP=chat-full-r3, log `logs/chat-full-r3.log`;
+  ETA ~15/11; dump class `-`
+    - settings checked: per post author, waves, miss, pulls
+      and forks = chat r2 (first 40 posts); recheck at 5k
 - [ ] per 5k: report + figs data to paper (as usenet r5)
-- [ ] then ask: resume chat 25k ckpt, r2 reorders, tmp.* dirs
-- [ ] running (26/11/02 01:47, PID 2278487): r4 command,
+- [ ] ask: scratch tmp.* dirs (r2 reorders: above)
+- [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
-- [ ] per 5k: report to f7 (as r4); END: dump, ops1k,
+- [x] per 5k: report to f7 (as r4); END: dump, ops1k,
   stor1k, report, clamps, begs
-- [ ] then resume chat from its 25k ckpt (ask)
+- [x] then resume chat from its 25k ckpt (ask)
 
 - same as r3 (reports per 5k, SOLO=100, keep S1/L45) plus:
-- [ ] arrivals: time and hops per post per peer (HOLD: ts);
+- [x] arrivals: time and hops per post per peer (HOLD: ts);
   delay by receiver class (on/ps/lf leaves, mids, supers);
   first / 50% / all
-- [ ] last peer per post; top-10 longest: path and the
+- [x] last peer per post; top-10 longest: path and the
   outages on it
-- [ ] wire bytes per sync: GIT_TRACE_PACKFILE, pack sizes
-- [ ] reorders at every mg sync, inline: snapshot `order`
+- [x] wire bytes per sync: GIT_TRACE_PACKFILE, pack sizes
+- [x] reorders at every mg sync, inline: snapshot `order`
   at ht, hf, hn; voided per merge too
-- [ ] fork lifetime: merge-base ht hf, its last action time;
+- [x] fork lifetime: merge-base ht hf, its last action time;
   max vs 7 days
-- [ ] begs at W=500/1000: post hoc, new script for the
+- [x] begs at W=500/1000: post hoc, new script for the
   index layout (not blocked.py)
 - cost: ~+5-10% (reorders +2-4 h); ETA ~80-85 h
-- [ ] user: approve the edit; stop r3 or wait for its END
+- [x] user: approve the edit; stop r3 or wait for its END
+
+# Cleanup (26/11/04)
+
+- stale open items closed: superseded by r2-r5, chat r3
+- still open: chat r3, partitions, scaling rerun on the
+  post-only DAG build, r2 reorders resume
 
 # Won't do
 
@@ -1696,3 +1695,11 @@
 - offline leaves from the data's sessions (churn uses tier
   numbers instead, see Churn)
 - sibling (leaf-leaf) links: no measurable effect under push
+- gap medians for lemmy/github/wiki (refetch)
+- compare with the tree-trash build
+- per-tier N (supers fast, leaves slow)
+- standalone topologies: small-world, nebula, scale-free
+- polling (blind) as a contrast
+- 5k run with merged usenet authors (forks check)
+- gc'd storage per r2 keep (r4/r5 stor1k instead)
+- clone writes snapshots loose (freechains side)
