@@ -1612,6 +1612,19 @@
 - [x] 15k sent to 4e (03/11 07:30): 84,663 s (r4 81,619);
   same forks; ops1k from scratch r5-join.log (r5.log to
   10k ckpt + resume log); ETA ~04/11 14:30
+- [x] 15k figs 9-11 data to 4e (prop-cov, fork-miss,
+  fork-merges -15k; `forkmiss.lua`); text still holds
+- [x] 20k ready (03/11 13:45; scratch r5-*-20k, figs 9-11
+  -20k): 113,428 s (r4 111,129); user: send to
+  2606-vcs-82: reached via bridge:session_011eECoiYK8HJ8Va85zXTLZn
+  (remote, no local paths); 20k + figs 9-11 sent; tsvs in
+  private artifact r5 Figure Data (CaKHNUudSV6LW17PnTXnXM)
+- [x] begs dist r4 final for 82 (W 500: 3744/182/10/2;
+  1000: 3924/12/2/0), matches 4.93%/0.36%; rerun 1085 s
+- [x] clamps-20k for 82 (artifact): 6,069 of 19,998 (30.3%),
+  4.5/14.0/48.7 h; cid -> a by unique BORN (`born.lua`)
+- [x] merge-sizes-20k for 82 (artifact): all 9,918 merges,
+  n1+n2 4/11/59, min side 1/1/9, reorders <= 2: 79.6%
 - [ ] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
