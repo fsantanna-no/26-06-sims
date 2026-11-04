@@ -1631,6 +1631,33 @@
 - [x] 30k ready (04/11 ~05:10): 170,653 s (r4 171,251);
   forks 65% (= r4), fork life 11.3/26.9/58.0; dump rows
   match; report sent to 4e; END ~04/11 12:00
+- [x] END (04/11 ~12:10): PASS, 33,814 actions, 194,407 s;
+  forks 63% (51/64/88 = r4), fork life 11.4/27.0/58.0,
+  reorders 1/4/22; keep `usenet-full-mix-churn-r5-final`
+  has posts/arrivals/merges.tsv (rows match); report to 4e
+- [x] final data (scratch, 4e reads it): prop-cov, fork-miss,
+  fork-merges, clamps, merge-sizes, r5-forks1k/ops1k/stor1k
+  -final; all = paper except prop 50% at 5.1 h (text 6h)
+- [x] clamps final: 9,384 of 33,814 (27.8%), 4.4/14.0/48.7 h
+- [x] merge sizes final: n1+n2 4/11/59, min side 1/1/11,
+  reorders <= 2: 81.5%
+- [x] `ops1k.lua` (scratch): partial last slice + end drain
+- [x] begs r5 final (4e): W 500 4.98% (r4 4.93%), dist
+  3743/184/10/2; W 1000 0.36% (= r4); 3,939 authors
+- [x] ops1k, stor1k final to 4e (same cols as imgs)
+- [x] chat resume dropped: r2 had no MIX (L:nil), dumps
+  only from 25k; user: same graphs as usenet -> restart
+- [x] r2 ckpt 25k kept as `.freechains-keep/chat-full-r2-25k-ckpt`
+- [x] chat r3 smoke 300 (CKPT_N=100, BASE in scratch, log
+  `logs/chat-smoke-r3.log`): PASS 776 s; dump 300/17,700/55
+  rows; forks 85% (on 79, ps 100, lf 97; r2 no MIX ~11%),
+  reorders 1/20/79, propagation all median 28.7 h
+- [ ] chat r3 running (26/11/04 16:26, PID 1188851):
+  CORPUS=chat LIMIT=155528 SM=21600 LM=86400 MERGES=1 MIX=1
+  CHURN=1 EV_N=0 SOLO=100 KEEP=chat-full-r3 (no DEFER), log
+  `logs/chat-full-r3.log`; ETA ~15/11 or later
+- [ ] per 5k: report + figs data to paper (as usenet r5)
+- [ ] then ask: resume chat 25k ckpt, r2 reorders, tmp.* dirs
 - [ ] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
