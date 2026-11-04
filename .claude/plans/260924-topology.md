@@ -1625,6 +1625,12 @@
   4.5/14.0/48.7 h; cid -> a by unique BORN (`born.lua`)
 - [x] merge-sizes-20k for 82 (artifact): all 9,918 merges,
   n1+n2 4/11/59, min side 1/1/9, reorders <= 2: 79.6%
+- [x] 25k ready (03/11 ~20:45): 140,392 s; forks 67%,
+  fork life 11.2/27.0/58.0; dump rows match; 82 bridge
+  stale (409); user: report to 2606-vcs-4e instead (sent)
+- [x] 30k ready (04/11 ~05:10): 170,653 s (r4 171,251);
+  forks 65% (= r4), fork life 11.3/26.9/58.0; dump rows
+  match; report sent to 4e; END ~04/11 12:00
 - [ ] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
