@@ -1654,6 +1654,16 @@
     - [x] 5k, 15k, 20k ckpt copies in scratch `chat-r3-*`;
       10k state lost
     - [x] 20k dumps sent to 4e; asked for draft figs
+    - [x] 4e: drafts in main.tex (prop/depth/time-chat)
+    - [x] 20k fork-miss (log miss, 2,208) + clamps
+      (1,021, 5.1%, max 900 s) sent to 4e
+    - [x] 4e redrew drafts from both (md5 ok)
+    - [x] 20k ops1k + stor1k (gc'd S1, 41.16 MB) and
+      per-pull stats (chat 20k, r5 END) sent to 4e;
+      4e drops r2 data everywhere
+    - [ ] ask: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL
+    - [ ] END for 4e: posts, arrivals, merges, miss,
+      clamps, begs/reps replay
     - [ ] 25k, 30k, END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
