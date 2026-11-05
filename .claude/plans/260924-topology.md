@@ -1651,8 +1651,8 @@
       and forks = chat r2 (first 40 posts); recheck at 5k
     - [x] 5k-20k: forks, pulls = r2; 0 errors
 - [ ] per 5k: report + figs data to paper (as usenet r5)
-    - [x] 5k, 15k, 20k ckpt copies in scratch `chat-r3-*`;
-      10k state lost
+    - [x] 5k, 15k, 20k, 25k ckpt copies in scratch
+      `chat-r3-*`; 10k state lost
     - [x] 20k dumps sent to 4e; asked for draft figs
     - [x] 4e: drafts in main.tex (prop/depth/time-chat)
     - [x] 20k fork-miss (log miss, 2,208) + clamps
@@ -1661,10 +1661,12 @@
     - [x] 20k ops1k + stor1k (gc'd S1, 41.16 MB) and
       per-pull stats (chat 20k, r5 END) sent to 4e;
       4e drops r2 data everywhere
-    - [ ] ask: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL
+    - [ ] ask: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL,
+      tmp.nDszULLH8Z
     - [ ] END for 4e: posts, arrivals, merges, miss,
       clamps, begs/reps replay
-    - [ ] 25k, 30k, END
+    - [x] 25k: dumps, miss, clamps, ops, stor sent to 4e
+    - [ ] 30k, END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
