@@ -1649,7 +1649,12 @@
   ETA ~15/11; dump class `-`
     - settings checked: per post author, waves, miss, pulls
       and forks = chat r2 (first 40 posts); recheck at 5k
+    - [x] 5k-20k: forks, pulls = r2; 0 errors
 - [ ] per 5k: report + figs data to paper (as usenet r5)
+    - [x] 5k, 15k, 20k ckpt copies in scratch `chat-r3-*`;
+      10k state lost
+    - [x] 20k dumps sent to 4e; asked for draft figs
+    - [ ] 25k, 30k, END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
