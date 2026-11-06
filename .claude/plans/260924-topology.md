@@ -1677,13 +1677,25 @@
       (rules.lua advance, env.beg); paper: it is
     - `fc-paper/`: one-line variant (like counts)
     - [x] `tick` session: bug (main too); fix waits user
-    - [ ] usenet r5 END code (running 26/11/05 23:28)
-    - [ ] chat r3 25k code
-    - [ ] usenet + chat paper variant
-    - [ ] send begs/reps tsvs, tick stats, wall times
+    - [x] usenet r5 END code: 4,809 s; begs 1.30%, 0 acting
+    - [x] chat r3 25k code: 3,755 s; begs 21.24%, 0 acting
+    - [x] usenet paper: 4,677 s; begs = code (1.30%, same
+      posts), pioneer acting 4,480; reps differ for 3
+    - [ ] chat 25k paper (running 16:27)
+    - [ ] chat END paper (official chat numbers)
+    - [x] usenet paper results sent to 4e, asked for a draft
+    - [ ] send chat begs/reps, tick stats, wall times
+- [ ] member likers (`closed2.py`): random member, reps
+  >= 5k, acted in last 7 days; else pioneer+dictator
+    - [x] chat smoke 2k: 593 likes, 284 by pioneer, 0 fails
+    - [ ] usenet r5 final, chat 25k (queued, `chain2.sh`)
+    - [ ] summary: begs, likers, fallback share, ticks
     - [x] 40k state in scratch `chat-r3-40k`; 30k, 35k lost
+    - [x] 45k state in scratch `chat-r3-45k`
+    - [x] 50k state in scratch `chat-r3-50k`
     - [x] 40k: dumps, miss, clamps, ops, stor sent to 4e
-    - [ ] 4e: 40k diff vs 25k, paper update
+    - [x] 4e: 40k no major change; figs in its scratch v40
+    - [ ] 4e: paper update (waits user OK there)
     - [ ] END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
