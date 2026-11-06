@@ -1681,7 +1681,10 @@
     - [ ] chat r3 25k code
     - [ ] usenet + chat paper variant
     - [ ] send begs/reps tsvs, tick stats, wall times
-    - [ ] 30k, END
+    - [x] 40k state in scratch `chat-r3-40k`; 30k, 35k lost
+    - [x] 40k: dumps, miss, clamps, ops, stor sent to 4e
+    - [ ] 4e: 40k diff vs 25k, paper update
+    - [ ] END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
