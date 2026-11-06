@@ -1662,10 +1662,25 @@
       per-pull stats (chat 20k, r5 END) sent to 4e;
       4e drops r2 data everywhere
     - [ ] ask: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL,
-      tmp.nDszULLH8Z
+      tmp.nDszULLH8Z, tmp.5nTtK5zwm2
     - [ ] END for 4e: posts, arrivals, merges, miss,
       clamps, begs/reps replay
     - [x] 25k: dumps, miss, clamps, ops, stor sent to 4e
+    - [x] 25k begs (W500 28.7%, 119/127 authors) + reps
+      (141 authors) sent to 4e; same open-chain policy
+        - posting_days approx (UTC days): replay lost
+    - [ ] maybe: rebuild tick replay for exact days
+- [ ] closed-chain beg replay for 4e (real freechains,
+  pioneer+dictator likes 500, S1 order at P_i)
+    - scratch `closed.py`, `closed-sum.py`, `fc/` (tick log)
+    - code: beg-admitting like is not tick activity
+      (rules.lua advance, env.beg); paper: it is
+    - `fc-paper/`: one-line variant (like counts)
+    - [x] `tick` session: bug (main too); fix waits user
+    - [ ] usenet r5 END code (running 26/11/05 23:28)
+    - [ ] chat r3 25k code
+    - [ ] usenet + chat paper variant
+    - [ ] send begs/reps tsvs, tick stats, wall times
     - [ ] 30k, END
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
