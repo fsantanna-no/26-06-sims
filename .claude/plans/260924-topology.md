@@ -1689,7 +1689,9 @@
   >= 5k, acted in last 7 days; else pioneer+dictator
     - [x] chat smoke 2k: 593 likes, 284 by pioneer, 0 fails
     - [ ] usenet r5 final, chat 25k (queued, `chain2.sh`)
-    - [ ] summary: begs, likers, fallback share, ticks
+    - [x] `closed2-sum.py`: pioneer share, likers, eligible
+      (smoke: pioneer 48%, 13 likers, top 10 = 98%)
+    - [ ] run it on usenet and chat 25k
     - [x] 40k state in scratch `chat-r3-40k`; 30k, 35k lost
     - [x] 45k state in scratch `chat-r3-45k`
     - [x] 50k state in scratch `chat-r3-50k`
