@@ -1681,14 +1681,15 @@
     - [x] chat r3 25k code: 3,755 s; begs 21.24%, 0 acting
     - [x] usenet paper: 4,677 s; begs = code (1.30%, same
       posts), pioneer acting 4,480; reps differ for 3
-    - [ ] chat 25k paper (running 16:27)
+    - [x] chat 25k paper: 3,873 s; begs 20.65% (code
+      21.24%), pioneer acting 150 of 248 ticks
     - [ ] chat END paper (official chat numbers)
     - [x] usenet paper results sent to 4e, asked for a draft
     - [ ] send chat begs/reps, tick stats, wall times
 - [ ] member likers (`closed2.py`): random member, reps
   >= 5k, acted in last 7 days; else pioneer+dictator
     - [x] chat smoke 2k: 593 likes, 284 by pioneer, 0 fails
-    - [ ] usenet r5 final, chat 25k (queued, `chain2.sh`)
+    - [ ] usenet r5 final (running 18:36), chat 25k (next)
     - [x] `closed2-sum.py`: pioneer share, likers, eligible
       (smoke: pioneer 48%, 13 likers, top 10 = 98%)
     - [ ] run it on usenet and chat 25k
