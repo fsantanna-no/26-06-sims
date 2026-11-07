@@ -1694,7 +1694,7 @@
       872 likers, cap 19 (dictator-only 44)
     - [x] chat 25k: 2,948 s; begs 14.42% (dictator-only
       20.65%), pioneer 15.1%, 70 likers, cap 0 (7)
-    - [ ] send member-liker results to 4e
+    - [x] member-liker and chat paper results sent to 4e
     - [x] 40k state in scratch `chat-r3-40k`; 30k, 35k lost
     - [x] 45k state in scratch `chat-r3-45k`
     - [x] 50k state in scratch `chat-r3-50k`
