@@ -1689,13 +1689,16 @@
 - [ ] member likers (`closed2.py`): random member, reps
   >= 5k, acted in last 7 days; else pioneer+dictator
     - [x] chat smoke 2k: 593 likes, 284 by pioneer, 0 fails
-    - [ ] usenet r5 final (running 18:36), chat 25k (next)
     - [x] `closed2-sum.py`: pioneer share, likers, eligible
-      (smoke: pioneer 48%, 13 likers, top 10 = 98%)
-    - [ ] run it on usenet and chat 25k
+    - [x] usenet: 5,128 s; begs 1.26%, pioneer 5.7% of likes,
+      872 likers, cap 19 (dictator-only 44)
+    - [x] chat 25k: 2,948 s; begs 14.42% (dictator-only
+      20.65%), pioneer 15.1%, 70 likers, cap 0 (7)
+    - [ ] send member-liker results to 4e
     - [x] 40k state in scratch `chat-r3-40k`; 30k, 35k lost
     - [x] 45k state in scratch `chat-r3-45k`
     - [x] 50k state in scratch `chat-r3-50k`
+    - [x] 55k state in scratch `chat-r3-55k`
     - [x] 40k: dumps, miss, clamps, ops, stor sent to 4e
     - [x] 4e: 40k no major change; figs in its scratch v40
     - [ ] 4e: paper update (waits user OK there)
