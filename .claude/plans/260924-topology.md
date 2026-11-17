@@ -1699,10 +1699,54 @@
     - [x] 45k state in scratch `chat-r3-45k`
     - [x] 50k state in scratch `chat-r3-50k`
     - [x] 55k state in scratch `chat-r3-55k`
+    - [x] 60k state in scratch `chat-r3-60k`
+    - [x] 65k state in scratch `chat-r3-65k`
+    - [x] reboot 07/11 15:30 at 70,572: /tmp scratch lost
+      (states 5k-65k, replays); resumed 09/11 from 70k ckpt,
+      log `chat-full-r3-resume.log`, first posts = old log
+    - [x] scripts recovered to /x/tmp/sims-7a (fc, fc-paper,
+      closed*, stor1k, forkmiss-chat, born-chat)
+    - [x] paper repo data/ keeps usenet-closed2, chat 20k,
+      25k, 40k files; lost: closed2-chat (needed at END)
+    - [x] stor 70k: 211.5 MB, 62x; snapshots per 5k grow
+      5.9 -> 20.7 MB, still superlinear
+    - [x] cause: trees rewritten per snapshot grow with N
+      (actions/xx 0.3 -> 8.4 -> 21.6 kB, order 0.1 -> 6.3
+      -> 12.6 kB at 1k/35k/70k); blobs flat at 12-15 kB
+    - [x] `ckpt-watch.sh`: copies each ckpt state to
+      /x/tmp/sims-7a until END (70k copied)
     - [x] 40k: dumps, miss, clamps, ops, stor sent to 4e
     - [x] 4e: 40k no major change; figs in its scratch v40
     - [ ] 4e: paper update (waits user OK there)
-    - [ ] END
+    - [x] watcher fix: top-level `a` is the last match
+        - 75k copy was labelled 37k; renamed; 80k copied
+    - [x] 80k data sent to the paper session (10/11)
+        - `/x/tmp/sims-7a/chat-r3-80k` (7 tsvs)
+        - forks 12.1%, clamps 5.0%, half 4 s: as at 40k
+        - storage 261 MB, 67x: quadratic, not linear
+    - [x] storage cause, on disk (`snapall.py`, packed)
+        - trees delta well; raw view overstated them
+        - chat kB/snapshot 1.06 -> 4.12 (10k -> 80k)
+        - half `meta.lua` (open tick ids), half actions/xx
+        - usenet 1.87, 2.53, 2.51: trees grow, meta small
+        - correction sent to the paper session
+    - [ ] why chat `meta.lua` packs worse over time
+    - [x] disk: ckpt peak would fill /x near 130k-135k
+        - user OK: /x/tmp (but sims-7a), installers,
+          usenet ckpt, chat r2 25k ckpt, 2k hardfork keep
+        - free 85 -> 128 GB; recheck margin each status
+    - [x] disk, 11/11: user OK to drop superseded keeps
+        - usenet r2, r4, plain, lf-slot; chat bk, r2,
+          on-churn-defer; chrome model, firefox cache
+        - free 119 -> 131 GB; r3 and r5 keeps untouched
+    - [x] END 15/11 03:34: PASS, 155,528 posts, 0 errors
+        - reboot 17/11 after END: nothing lost
+        - working dirs deleted (user OK), 155 GB free
+    - [x] END data to paper session (now 2606-vcs-72)
+        - `/x/tmp/sims-7a/chat-r3-end`; ops1k.lua: partial slice
+        - forks 11.0%, clamps 4.6%, storage 830 MB (103x)
+    - [ ] END begs replay (closed2, 5k, seed 1): running
+        - `/x/tmp/sims-7a/closed2-chat-end`; then closed2-sum.py
 - [ ] ask: scratch tmp.* dirs (r2 reorders: above)
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
