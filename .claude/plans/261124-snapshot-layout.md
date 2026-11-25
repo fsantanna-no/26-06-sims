@@ -103,8 +103,16 @@
 - 16-way shards: freechains 99e83e9 (layout=3), 25/11
     - `actions/a/b/c/d/<cid>`, `members/a/b/c/d/<enc>`
     - installed; 49/49 suites, guide.sh pass
-- [ ] replay 99e83e9, gc every 5k, chat and usenet
-    - compare with 86e601f (disk per 5k, time, end state)
+- [x] replay 99e83e9, gc every 5k, chat and usenet, 25/11
+    - order and reps identical at end, both corpora
+    - chat disk: 0f43041 1,304, 86e601f 815, 99e83e9 435 MB
+    - chat MB per 5k: 99e83e9 13.1 -> 15.0 (~linear)
+    - chat recv s per 5k: ~140 flat
+    - chat packed kB/snapshot: 1.45 (10k) -> 2.30 (155k)
+    - usenet disk: 228, 238, 179 MB; ~31 MB per 5k flat
+    - usenet packed kB/snapshot: ~2.9 flat
+- [ ] send 99e83e9 results to the paper sessions
+- [ ] delete replay copies (`gc-*/src`, `gc-*/peer`)
 
 - storage: replay each END chain on one peer
 - op time: post/ff bench on copies at 10k..155k
