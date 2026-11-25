@@ -1556,7 +1556,7 @@
   (11 cols, gc'd S1), END report, clamps, begs; 1k slices
     - wipes `.freechains-p2p-chat` (6.1 GB, killed run);
       keeps `chat-full-bk-*` untouched; disk 119 GB free
-- [ ] r2 reorders resume on the old build (`ab304a9`): ask
+- [-] won't do: r2 reorders resume (`ab304a9`), keeps deleted
 
 # Usenet r5: per-post dump (26/11/01, asked by f7; user: yes)
 
@@ -1643,14 +1643,14 @@
   log `logs/chat-full-r3-mix-stopped.log`
 - [x] smoke 300 with r2 flags (`chat-smoke-r3b`): PASS 699 s;
   forks 5%, dump 300/17,700/15 rows, class `-`
-- [ ] chat r3 running (26/11/04 17:18, PID 362003):
+- [x] chat r3 running (26/11/04 17:18, PID 362003):
   CORPUS=chat LIMIT=155528 MERGES=1 CHURN=1 DEFER=1 EV_N=0
   SOLO=100 KEEP=chat-full-r3, log `logs/chat-full-r3.log`;
   ETA ~15/11; dump class `-`
     - settings checked: per post author, waves, miss, pulls
       and forks = chat r2 (first 40 posts); recheck at 5k
     - [x] 5k-20k: forks, pulls = r2; 0 errors
-- [ ] per 5k: report + figs data to paper (as usenet r5)
+- [x] per 5k: report + figs data to paper (as usenet r5)
     - [x] 5k, 15k, 20k, 25k ckpt copies in scratch
       `chat-r3-*`; 10k state lost
     - [x] 20k dumps sent to 4e; asked for draft figs
@@ -1661,16 +1661,16 @@
     - [x] 20k ops1k + stor1k (gc'd S1, 41.16 MB) and
       per-pull stats (chat 20k, r5 END) sent to 4e;
       4e drops r2 data everywhere
-    - [ ] ask: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL,
+    - [x] none left: scratch tmp.253TT5unjM, tmp.zgxbM9IXdL,
       tmp.nDszULLH8Z, tmp.5nTtK5zwm2
-    - [ ] END for 4e: posts, arrivals, merges, miss,
+    - [x] END for 4e: posts, arrivals, merges, miss,
       clamps, begs/reps replay
     - [x] 25k: dumps, miss, clamps, ops, stor sent to 4e
     - [x] 25k begs (W500 28.7%, 119/127 authors) + reps
       (141 authors) sent to 4e; same open-chain policy
         - posting_days approx (UTC days): replay lost
-    - [ ] maybe: rebuild tick replay for exact days
-- [ ] closed-chain beg replay for 4e (real freechains,
+    - [-] won't do: maybe: rebuild tick replay for exact days
+- [x] closed-chain beg replay for 4e (real freechains,
   pioneer+dictator likes 500, S1 order at P_i)
     - scratch `closed.py`, `closed-sum.py`, `fc/` (tick log)
     - code: beg-admitting like is not tick activity
@@ -1683,10 +1683,10 @@
       posts), pioneer acting 4,480; reps differ for 3
     - [x] chat 25k paper: 3,873 s; begs 20.65% (code
       21.24%), pioneer acting 150 of 248 ticks
-    - [ ] chat END paper (official chat numbers)
+    - [x] chat END paper (official chat numbers)
     - [x] usenet paper results sent to 4e, asked for a draft
-    - [ ] send chat begs/reps, tick stats, wall times
-- [ ] member likers (`closed2.py`): random member, reps
+    - [x] send chat begs/reps, tick stats, wall times
+- [x] member likers (`closed2.py`): random member, reps
   >= 5k, acted in last 7 days; else pioneer+dictator
     - [x] chat smoke 2k: 593 likes, 284 by pioneer, 0 fails
     - [x] `closed2-sum.py`: pioneer share, likers, eligible
@@ -1717,7 +1717,7 @@
       /x/tmp/sims-7a until END (70k copied)
     - [x] 40k: dumps, miss, clamps, ops, stor sent to 4e
     - [x] 4e: 40k no major change; figs in its scratch v40
-    - [ ] 4e: paper update (waits user OK there)
+    - [-] dup of the paper session item below
     - [x] watcher fix: top-level `a` is the last match
         - 75k copy was labelled 37k; renamed; 80k copied
     - [x] 80k data sent to the paper session (10/11)
@@ -1730,7 +1730,29 @@
         - half `meta.lua` (open tick ids), half actions/xx
         - usenet 1.87, 2.53, 2.51: trees grow, meta small
         - correction sent to the paper session
-    - [ ] why chat `meta.lua` packs worse over time
+    - [x] meta.lua checks for paper (`metapack.sh`), 24/11
+        - holds only open tick: posts ids, posted, acting
+        - chat 355 of 830 MB; 38.5% stored whole
+        - repack depth/window 250: chat 830 -> 1,559 MB,
+          usenet 151 -> 235 MB; git defaults not to blame
+    - [x] snap-usenet-end.tsv; snapall.py partial slice fix
+    - [x] layout test, chat END (`/x/tmp/sims-7a/layout`)
+        - A as is, B actions/xx/yy + order/NN, C = B + meta
+        - raw kB/snapshot 10k->155k: A 24->106, B 24->41,
+          C 16->31 (B/C saturate: no linear growth)
+        - packed MB (test packing): A 1,335, B 1,297, C 647
+        - packed C per snapshot flat: 3.55 -> 3.98 kB
+    - [x] order rechunked on top of C (`build2.py`)
+        - packed MB: A 1,335, C 647, C+50 382, C+20 333
+        - C+50 per snapshot 1.80 -> 2.26 kB (10k -> 155k)
+        - left: meta 0.64, order 0.57, trees 0.7, action 0.18
+    - [x] time profile on keep copies (`tprof/bench.sh`)
+        - Lua work per op grows with chain; 82-88% is sha1
+        - pure-Lua sha1 8.2 MB/s over rewritten snapshot
+        - post Lua instr 2.5M (10k) -> 10.7M (155k)
+        - ff Lua instr 7.3M -> 48.2M; git time ~flat
+    - [ ] decide: layout change + C sha1 in freechains,
+      then storage replay and p2p reruns (user)
     - [x] disk: ckpt peak would fill /x near 130k-135k
         - user OK: /x/tmp (but sims-7a), installers,
           usenet ckpt, chat r2 25k ckpt, 2k hardfork keep
@@ -1745,9 +1767,15 @@
     - [x] END data to paper session (now 2606-vcs-72)
         - `/x/tmp/sims-7a/chat-r3-end`; ops1k.lua: partial slice
         - forks 11.0%, clamps 4.6%, storage 830 MB (103x)
-    - [ ] END begs replay (closed2, 5k, seed 1): running
-        - `/x/tmp/sims-7a/closed2-chat-end`; then closed2-sum.py
-- [ ] ask: scratch tmp.* dirs (r2 reorders: above)
+    - [x] END begs replay (closed2, 5k, seed 1), 10.0 h
+        - `/x/tmp/sims-7a/closed2-chat-end`, sent to paper
+        - begs 43.1% (25k 14.4%), pioneer 37.5% of likes
+        - no eligible member in 37.5% of begs
+        - tick median 19.1 h; 0 at cap, 1 negative
+    - [x] paper kept END sets, md5 ok: data/chat-r3-end,
+      data/chat-closed2-end; no reruns needed
+    - [ ] paper session: chat END text and figs (user OK there)
+- [x] none left: scratch tmp.* dirs
 - [x] running (26/11/02 01:47, PID 2278487): r4 command,
   KEEP=usenet-full-mix-churn-r5,
   log `logs/usenet-full-mix-churn-r5.log`; ETA ~04/11 09:00
