@@ -111,8 +111,14 @@
     - chat packed kB/snapshot: 1.45 (10k) -> 2.30 (155k)
     - usenet disk: 228, 238, 179 MB; ~31 MB per 5k flat
     - usenet packed kB/snapshot: ~2.9 flat
-- [ ] send 99e83e9 results to the paper sessions
-- [ ] delete replay copies (`gc-*/src`, `gc-*/peer`)
+- [x] send 99e83e9 results to freechains-paper, 25/11
+    - uerj-paper not listed (offline)
+- [x] delete replay copies (`gc-*/src`, `gc-*/peer`)
+- [x] p2p smoke on 99e83e9: chat `LIMIT=100`, PASS, 25/11
+    - 58 peers same order; reps 0 mismatches; 4m17
+    - `N_ACT` env is not read (MODE fixed to corpus)
+- [ ] decide p2p reruns on 99e83e9 (usenet first)
+- [ ] explain replay > real disk (old chat 1,304 vs 830)
 
 - storage: replay each END chain on one peer
 - op time: post/ff bench on copies at 10k..155k
