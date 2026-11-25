@@ -117,7 +117,12 @@
 - [x] p2p smoke on 99e83e9: chat `LIMIT=100`, PASS, 25/11
     - 58 peers same order; reps 0 mismatches; 4m17
     - `N_ACT` env is not read (MODE fixed to corpus)
-- [ ] decide p2p reruns on 99e83e9 (usenet first)
+- [ ] usenet r6 on 99e83e9: running (25/11 10:30)
+    - r5 command, KEEP=usenet-full-mix-churn-r6
+    - log `p2p/logs/usenet-full-mix-churn-r6.log`
+    - ETA ~27/11 12:00 (r5: ~50 h)
+    - per 5k: compare with r5 (time, forks, storage)
+- [ ] chat rerun on 99e83e9 (~200 h): decide after r6
 - [ ] explain replay > real disk (old chat 1,304 vs 830)
 
 - storage: replay each END chain on one peer
