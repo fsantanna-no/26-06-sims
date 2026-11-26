@@ -122,6 +122,13 @@
     - log `p2p/logs/usenet-full-mix-churn-r6.log`
     - ETA ~27/11 12:00 (r5: ~50 h)
     - per 5k: compare with r5 (time, forks, storage)
+    - 5k: disk r5 21.5, r6 26.0 MB (+21%); time -3%
+    - 10k: disk r5 46.9, r6 55.5 MB (+18%); time -5%
+        - 5k -> 10k: r5 +25.4, r6 +29.5 MB
+        - trees: 2x objects (245k vs 115k), raw 3.4x less
+        - forks, pulls identical to r5
+    - replay predicted a gain (30 vs 36 MB at 5k): wrong
+      for real peers (small syncs, not 5k per sync)
 - [ ] chat rerun on 99e83e9 (~200 h): decide after r6
 - [ ] explain replay > real disk (old chat 1,304 vs 830)
 
