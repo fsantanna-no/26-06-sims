@@ -129,7 +129,19 @@
         - forks, pulls identical to r5
     - replay predicted a gain (30 vs 36 MB at 5k): wrong
       for real peers (small syncs, not 5k per sync)
-- [ ] chat rerun on 99e83e9 (~200 h): decide after r6
+- [x] usenet r6 END (27/11 ~17:40): PASS, 33,814 actions
+    - order 0 of 58 differ; reps 0 mismatches
+    - disk one peer: r5 161.2, r6 180.1 MB (+11.7%)
+    - 20k +16%, 25k +14%, 30k +13% (r6 vs r5)
+    - time at 33.8k: r5 194,263, r6 197,361 s (+1.6%)
+    - forks 63% (= r5)
+    - usenet: no gain from the new layout
+    - keep `usenet-full-mix-churn-r6-final`
+- [ ] chat r4 on 99e83e9: running (27/11 17:52)
+    - r3 command, KEEP=chat-full-r4
+    - log `p2p/logs/chat-full-r4.log`; ETA ~06/12
+    - first 20 posts: pulls, forks = r3
+    - per 5k: disk, time vs r3 (r3 superlinear disk)
 - [ ] explain replay > real disk (old chat 1,304 vs 830)
 
 - storage: replay each END chain on one peer
